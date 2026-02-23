@@ -15,16 +15,16 @@ func CreatedShortURL(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	su, exs := service.TryCreateShortURL(string(b))
+	if !exs {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+	}
 	_, err = w.Write([]byte("http://" + r.Host + "/" + su))
 	if err != nil {
 		w.WriteHeader(http.StatusBadGateway)
 		return
 	}
-	if exs {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	w.WriteHeader(http.StatusCreated)
 }
 
 func GetShortURL(w http.ResponseWriter, r *http.Request) {
