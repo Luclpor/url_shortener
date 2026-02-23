@@ -3,21 +3,30 @@ package service
 import "github.com/Luclpor/url_shortener.git/internal/model"
 
 func TryCreateShortURL(longURL string) (string, bool) {
-	key := GenerateRandomString(5)
 	urls := model.GetUrls()
-	_, ok := urls[key]
-	if !ok && containsValue(urls, longURL) {
-		urls[key] = longURL
-		return urls[key], true
+	k, b := containsValue(urls, longURL)
+	if b {
+		return k, false
 	}
-	return urls[key], false
+	key := getUniqueKey(urls)
+	urls[key] = longURL
+	return key, true
 }
 
-func containsValue(urls map[string]string, code string) bool {
-	for _, v := range urls {
+func containsValue(urls map[string]string, code string) (string, bool) {
+	for k, v := range urls {
 		if v == code {
-			return false
+			return k, true
 		}
 	}
-	return true
+	return "", false
+}
+
+func getUniqueKey(urls model.URL) string {
+	key := GenerateRandomString(5)
+	_, ok := urls[key]
+	if ok {
+		getUniqueKey(urls)
+	}
+	return key
 }
