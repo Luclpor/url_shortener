@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/service"
 )
 
@@ -18,11 +19,11 @@ func CreatedShortURL(w http.ResponseWriter, r *http.Request) {
 	if !exs {
 		w.WriteHeader(http.StatusOK)
 	} else {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusInternalServerError)
 	}
-	_, err = w.Write([]byte("http://" + r.Host + "/" + su))
+	_, err = w.Write([]byte(config.GlobalConfig.Host + "/" + su))
 	if err != nil {
-		w.WriteHeader(http.StatusBadGateway)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }

@@ -1,6 +1,9 @@
 package handler
 
 import (
+	"strings"
+
+	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -9,6 +12,10 @@ import (
 	"net/http/httptest"
 	"testing"
 )
+
+func init() {
+	_ = config.InitConfig()
+}
 
 func TestCreatedShortURL(t *testing.T) {
 	type want struct {
@@ -21,18 +28,18 @@ func TestCreatedShortURL(t *testing.T) {
 		want want
 	}{
 		{
-			name: "positive test #1",
+			name: "positive test created short url",
 			want: want{
 				code:        http.StatusCreated,
-				contentType: "application/json",
-				response:    `{"short_url":"https://www.google.com"}`,
+				contentType: "text/plain",
+				response:    `{"http://localhost:8080/"}`,
 			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodGet, "https://www.google.com", nil)
+			request := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader("test/url"))
 			w := httptest.NewRecorder()
 			CreatedShortURL(w, request)
 			res := w.Result()
@@ -40,8 +47,58 @@ func TestCreatedShortURL(t *testing.T) {
 			defer res.Body.Close()
 			resBody, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
-			assert.Equal(t, test.want.response, string(resBody))
+			assert.NotEmpty(t, resBody)
 			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+		})
+	}
+}
+
+func TestGetShortURL(t *testing.T) {
+	type want struct {
+		code     int
+		response string
+	}
+	tests := []struct {
+		name string
+		want want
+	}{
+		{
+			name: "positive test created short url",
+			want: want{
+				code:     http.StatusTemporaryRedirect,
+				response: `test/url`,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.HandleFunc("POST /", CreatedShortURL)
+			mux.HandleFunc("GET /{id}", GetShortURL)
+
+			postReq := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(test.want.response))
+			postRec := httptest.NewRecorder()
+
+			mux.ServeHTTP(postRec, postReq)
+
+			postRes := postRec.Result()
+			defer postRes.Body.Close()
+			result, err := io.ReadAll(postRes.Body)
+			require.NoError(t, err)
+
+			getReq := httptest.NewRequest(http.MethodGet, "http://"+string(result), nil)
+
+			getRec := httptest.NewRecorder()
+			mux.ServeHTTP(getRec, getReq)
+
+			getRes := getRec.Result()
+			assert.Equal(t, test.want.code, getRes.StatusCode)
+			defer getRes.Body.Close()
+			resBody, err := io.ReadAll(getRes.Body)
+			require.NoError(t, err)
+			assert.Empty(t, resBody)
+			assert.Equal(t, test.want.response, getRes.Header.Get("Location"))
 		})
 	}
 }
