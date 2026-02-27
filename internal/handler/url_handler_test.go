@@ -87,12 +87,12 @@ func TestGetShortURL(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		shortUrl string
+		shortURL string
 		want     want
 	}{
 		{
 			name:     "redirects to full url",
-			shortUrl: "gle",
+			shortURL: "gle",
 			want: want{
 				code:     http.StatusTemporaryRedirect,
 				location: "https://www.google.com",
@@ -100,7 +100,7 @@ func TestGetShortURL(t *testing.T) {
 		},
 		{
 			name:     "not found",
-			shortUrl: "notExist",
+			shortURL: "notExist",
 			want: want{
 				code: http.StatusBadRequest,
 			},
@@ -120,7 +120,7 @@ func TestGetShortURL(t *testing.T) {
 			mux.HandleFunc("GET /{id}", getHandler)
 
 			// важно: путь должен быть "/gle", чтобы mux положил PathValue("id") = "gle"
-			req := httptest.NewRequest(http.MethodGet, "/"+tt.shortUrl, nil)
+			req := httptest.NewRequest(http.MethodGet, "/"+tt.shortURL, nil)
 			rec := httptest.NewRecorder()
 
 			mux.ServeHTTP(rec, req)
