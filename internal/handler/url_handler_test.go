@@ -104,7 +104,7 @@ func TestGetShortURL(t *testing.T) {
 			fmt.Println("Created short ulr: ", string(result))
 			require.NoError(t, err)
 
-			getReq := httptest.NewRequest(http.MethodGet, "http://"+string(result), nil)
+			getReq := httptest.NewRequest(http.MethodGet, string(result), nil)
 
 			getRec := httptest.NewRecorder()
 			mux.ServeHTTP(getRec, getReq)
@@ -113,7 +113,7 @@ func TestGetShortURL(t *testing.T) {
 			assert.Equal(t, test.want.code, getRes.StatusCode)
 			defer getRes.Body.Close()
 			resBody, err := io.ReadAll(getRes.Body)
-			fmt.Println("Get full url:, ", string(resBody))
+			fmt.Println("Get full url:, ", test.want.response)
 			require.NoError(t, err)
 			assert.Empty(t, resBody)
 			assert.Equal(t, test.want.response, getRes.Header.Get("Location"))
