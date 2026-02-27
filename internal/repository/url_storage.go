@@ -13,18 +13,18 @@ func NewRepository() *InMemoryDB {
 	}
 }
 
-func (db *InMemoryDB) FindByShortURL(shortUrl string) (*model.URL, bool) {
+func (db *InMemoryDB) FindByShortURL(shortURL string) (*model.URL, bool) {
 	for _, u := range db.urls {
-		if u.ShortURL == shortUrl {
+		if u.ShortURL == shortURL {
 			return &u, true
 		}
 	}
 	return nil, false
 }
 
-func (db *InMemoryDB) FindByLongURL(longUrl string) (*model.URL, bool) {
+func (db *InMemoryDB) FindByLongURL(longURL string) (*model.URL, bool) {
 	for _, u := range db.urls {
-		if u.FullURL == longUrl {
+		if u.FullURL == longURL {
 			return &u, true
 		}
 	}
