@@ -31,10 +31,10 @@ func (db *InMemoryDB) FindByLongURL(longURL string) (*model.URL, bool) {
 	return nil, false
 }
 
-func (db *InMemoryDB) Save(shortUrl string, fullURl string) (*model.URL, error) {
+func (db *InMemoryDB) Save(shortURL string, fullURL string) (*model.URL, error) {
 	u := model.URL{
-		ShortURL: shortUrl,
-		FullURL:  fullURl,
+		ShortURL: shortURL,
+		FullURL:  fullURL,
 	}
 	db.urls = append(db.urls, u)
 	return &u, nil
