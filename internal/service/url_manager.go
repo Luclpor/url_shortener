@@ -7,9 +7,9 @@ import (
 )
 
 type URLRepository interface {
-	FindByShortURL(shortUrl string) (*model.URL, bool)
-	FindByLongURL(longUrl string) (*model.URL, bool)
-	Save(shortUrl string, fullURl string) (*model.URL, error)
+	FindByShortURL(shortURL string) (*model.URL, bool)
+	FindByLongURL(longURL string) (*model.URL, bool)
+	Save(shortURL string, fullURL string) (*model.URL, error)
 }
 
 type URLManager struct {
