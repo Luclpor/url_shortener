@@ -4,10 +4,6 @@ import "math/rand"
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func init() {
-	rand.Int()
-}
-
 func GenerateRandomString(length int) string {
 	str := make([]rune, length)
 	for i := range str {
