@@ -1,63 +1,80 @@
 package handler
 
 import (
-	"fmt"
-	"strings"
-
-	"github.com/Luclpor/url_shortener.git/internal/config"
-	"github.com/Luclpor/url_shortener.git/internal/repository"
-	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
-)
 
-func init() {
-	_ = config.InitConfig()
-}
+	"github.com/Luclpor/url_shortener.git/internal/config"
+	mocks "github.com/Luclpor/url_shortener.git/internal/repository/mock"
+	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 func TestCreatedShortURL(t *testing.T) {
 	type want struct {
 		code        int
-		response    string
 		contentType string
+		response    string
 	}
+
 	tests := []struct {
 		name string
 		body string
 		want want
 	}{
 		{
-			name: "positive test created short url",
-			body: "https://practicum.yandex.ru/",
+			name: "already exist",
+			body: "https://www.google.com",
+			want: want{
+				code:        http.StatusOK,
+				contentType: "text/plain",
+				response:    "http://localhost:8080/gle",
+			},
+		},
+
+		{
+			name: "successful creation",
+			body: "https://www.practicum.com",
 			want: want{
 				code:        http.StatusCreated,
 				contentType: "text/plain",
-				response:    `{"http://localhost:8080/"}`,
 			},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader("https://www.google.com"))
-			w := httptest.NewRecorder()
-			repo := repository.NewRepository()
-			manger := service.NewURLManager(repo)
-			createHandler := NewCreateHandler(config.InitConfig(), manger)
-			createHandler(w, request)
-			res := w.Result()
-			assert.Equal(t, test.want.code, res.StatusCode)
+	cfg := config.InitConfig()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRep := mocks.NewURLRepoMock()
+			_, _ = mockRep.Save("gle", "https://www.google.com")
+
+			manager := service.NewURLManager(mockRep)
+			createHandler := NewCreateHandler(cfg, manager)
+
+			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+
+			createHandler(rec, req)
+
+			res := rec.Result()
 			defer res.Body.Close()
-			resBody, err := io.ReadAll(res.Body)
+
+			assert.Equal(t, tt.want.code, res.StatusCode)
+
+			ct := res.Header.Get("Content-Type")
+			require.NotEmpty(t, ct)
+			assert.True(t, strings.HasPrefix(ct, tt.want.contentType), "Content-Type=%q", ct)
+
+			b, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
-			assert.NotEmpty(t, resBody)
-			fmt.Println(string(resBody))
-			assert.Equal(t, test.want.contentType, res.Header.Get("Content-Type"))
+			if tt.want.response != "" {
+				assert.Equal(t, tt.want.response, strings.TrimSpace(string(b)))
+			}
 		})
 	}
 }
@@ -65,58 +82,62 @@ func TestCreatedShortURL(t *testing.T) {
 func TestGetShortURL(t *testing.T) {
 	type want struct {
 		code     int
-		Header   http.Header
-		response string
+		location string
 	}
+
 	tests := []struct {
-		name    string
-		longURL string
-		want    want
+		name     string
+		shortUrl string
+		want     want
 	}{
 		{
-			name:    "positive test created short url",
-			longURL: "https://www.google.com",
+			name:     "redirects to full url",
+			shortUrl: "gle",
 			want: want{
 				code:     http.StatusTemporaryRedirect,
-				response: "https://www.google.com",
+				location: "https://www.google.com",
+			},
+		},
+		{
+			name:     "not found",
+			shortUrl: "notExist",
+			want: want{
+				code: http.StatusBadRequest,
 			},
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// полностью детерминируем: кладём запись заранее, чтобы не зависеть от генератора
+			mockRep := mocks.NewURLRepoMock()
+			_, _ = mockRep.Save("gle", "https://www.google.com")
+
+			manager := service.NewURLManager(mockRep)
+			getHandler := NewGetterHandler(manager)
+
 			mux := http.NewServeMux()
-			repo := repository.NewRepository()
-			manger := service.NewURLManager(repo)
-			createHandler := NewCreateHandler(config.InitConfig(), manger)
-			getHandler := NewGetterHandler(manger)
-			mux.HandleFunc("POST /", createHandler)
 			mux.HandleFunc("GET /{id}", getHandler)
 
-			postReq := httptest.NewRequest(http.MethodPost, "http://localhost:8080/", strings.NewReader(test.longURL))
-			postRec := httptest.NewRecorder()
+			// важно: путь должен быть "/gle", чтобы mux положил PathValue("id") = "gle"
+			req := httptest.NewRequest(http.MethodGet, "/"+tt.shortUrl, nil)
+			rec := httptest.NewRecorder()
 
-			mux.ServeHTTP(postRec, postReq)
+			mux.ServeHTTP(rec, req)
 
-			postRes := postRec.Result()
-			defer postRes.Body.Close()
-			result, err := io.ReadAll(postRes.Body)
-			fmt.Println("Created short ulr: ", string(result))
+			res := rec.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.want.code, res.StatusCode)
+
+			// у редиректа тело обычно пустое
+			body, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
+			assert.Empty(t, body)
 
-			getReq := httptest.NewRequest(http.MethodGet, string(result), nil)
-
-			getRec := httptest.NewRecorder()
-			mux.ServeHTTP(getRec, getReq)
-
-			getRes := getRec.Result()
-			assert.Equal(t, test.want.code, getRes.StatusCode)
-			defer getRes.Body.Close()
-			resBody, err := io.ReadAll(getRes.Body)
-			fmt.Println("Get full url:, ", test.want.response)
-			require.NoError(t, err)
-			assert.Empty(t, resBody)
-			assert.Equal(t, test.want.response, getRes.Header.Get("Location"))
+			if tt.want.location != "" {
+				assert.Equal(t, tt.want.location, res.Header.Get("Location"))
+			}
 		})
 	}
 }

@@ -38,6 +38,7 @@ func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 		s, err := manager.GetURL(r.PathValue("id"))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 		w.Header().Add("Location", s.FullURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
