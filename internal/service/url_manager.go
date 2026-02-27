@@ -44,14 +44,14 @@ func (m *URLManager) GetURL(shortURL string) (*model.URL, error) {
 	return url, nil
 }
 
-func (m *URLManager) getUniqueKey(longUrl string, count int) (string, bool) {
+func (m *URLManager) getUniqueKey(longURL string, count int) (string, bool) {
 	if count > 100 {
 		return "", false
 	}
 	key := GenerateRandomString(5)
 	_, ok := m.repo.FindByShortURL(key)
 	if ok {
-		m.getUniqueKey(longUrl, count)
+		m.getUniqueKey(longURL, count)
 	}
 	return key, true
 }
