@@ -24,6 +24,7 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 		if !exs {
 			w.WriteHeader(http.StatusOK)
 		}
+		w.WriteHeader(http.StatusCreated)
 		_, err = w.Write([]byte(cfg.Host + "/" + su))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -38,7 +39,7 @@ func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 		}
-		w.Header().Add("Location", s.ShortURL)
+		w.Header().Add("Location", s.FullURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }
