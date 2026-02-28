@@ -1,8 +1,6 @@
 package router
 
 import (
-	"net/http"
-
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/handler/api"
 	"github.com/Luclpor/url_shortener.git/internal/repository"
@@ -11,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter() http.Handler {
+func NewRouter() *chi.Mux {
 	cfg := config.InitConfig()
 	r := chi.NewRouter()
 

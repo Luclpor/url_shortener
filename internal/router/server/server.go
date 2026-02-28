@@ -28,7 +28,7 @@ func NewServer() *Server {
 
 	server := &Server{
 		&http.Server{
-			Addr:         cfg.Port,
+			Addr:         cfg.Host,
 			Handler:      router,
 			ReadTimeout:  cfg.Timeout,
 			WriteTimeout: cfg.Timeout,
@@ -42,21 +42,24 @@ func NewServer() *Server {
 func (s *Server) Start() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	<-quit
-
-	log.Println("Shutting down server...")
-
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
-	}
+	defer signal.Stop(quit)
 
 	go func() {
+		log.Printf("Server listening on %s\n", s.httpServer.Addr)
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
+
+	<-quit
+	log.Println("Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	if err := s.httpServer.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
 
 	log.Println("Server exited properly")
 }

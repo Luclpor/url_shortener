@@ -8,7 +8,6 @@ type Config struct {
 
 type HTTPServer struct {
 	Host        string
-	Port        string
 	Timeout     time.Duration
 	IdleTimeout time.Duration
 }
@@ -16,7 +15,9 @@ type HTTPServer struct {
 func InitConfig() *Config {
 	cfg := &Config{
 		HTTPServer: HTTPServer{
-			Host: "localhost:8080",
+			Host:        "localhost:8080",
+			Timeout:     time.Second * 4,
+			IdleTimeout: time.Second * 30,
 		},
 	}
 	return cfg
