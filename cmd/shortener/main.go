@@ -1,7 +1,10 @@
 package main
 
-import "github.com/Luclpor/url_shortener.git/internal/router"
+import (
+	"github.com/Luclpor/url_shortener.git/internal/router/server"
+)
 
 func main() {
-	router.RunServer()
+	s := server.NewServer()
+	s.Start()
 }

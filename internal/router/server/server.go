@@ -19,19 +19,21 @@ const (
 )
 
 type Server struct {
-	http.Server
+	httpServer *http.Server
 }
 
-func NewServer() *http.Server {
+func NewServer() *Server {
 	cfg := config.InitConfig()
 	router := router2.NewRouter()
 
-	server := &http.Server{
-		Addr:         cfg.Port,
-		Handler:      router,
-		ReadTimeout:  cfg.Timeout,
-		WriteTimeout: cfg.Timeout,
-		IdleTimeout:  cfg.IdleTimeout,
+	server := &Server{
+		&http.Server{
+			Addr:         cfg.Port,
+			Handler:      router,
+			ReadTimeout:  cfg.Timeout,
+			WriteTimeout: cfg.Timeout,
+			IdleTimeout:  cfg.IdleTimeout,
+		},
 	}
 
 	return server
@@ -46,12 +48,12 @@ func (s *Server) Start() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	if err := s.Shutdown(ctx); err != nil {
+	if err := s.httpServer.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 
 	go func() {
-		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
