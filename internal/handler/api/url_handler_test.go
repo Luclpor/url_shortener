@@ -32,7 +32,7 @@ func TestCreatedShortURL(t *testing.T) {
 			want: want{
 				code:        http.StatusOK,
 				contentType: "text/plain",
-				response:    "localhost:8080/gle",
+				response:    "http://localhost:8080/gle",
 			},
 		},
 

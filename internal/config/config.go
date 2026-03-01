@@ -18,7 +18,7 @@ type HTTPServer struct {
 
 func InitConfig() *Config {
 	h := flag.String("a", "localhost:8080", "host address server")
-	b := flag.String("b", "localhost:8080", "base url for short url")
+	b := flag.String("b", "http://localhost:8080", "base url for short url")
 
 	flag.Parse()
 
