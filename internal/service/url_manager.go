@@ -1,15 +1,16 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 )
 
 type URLRepository interface {
-	FindByShortURL(shortURL string) (*model.URL, bool)
-	FindByLongURL(longURL string) (*model.URL, bool)
-	Save(shortURL string, fullURL string) (*model.URL, error)
+	FindByShortURL(ctx context.Context, shortURL string) (*model.URL, bool)
+	FindByLongURL(ctx context.Context, longURL string) (*model.URL, bool)
+	Save(ctx context.Context, shortURL string, fullURL string) (*model.URL, error)
 }
 
 type URLManager struct {
@@ -20,15 +21,15 @@ func NewURLManager(repo URLRepository) *URLManager {
 	return &URLManager{repo: repo}
 }
 
-func (m *URLManager) TryCreateShortURL(longURL string) (string, bool, error) {
-	if url, b := m.repo.FindByLongURL(longURL); b {
+func (m *URLManager) TryCreateShortURL(ctx context.Context, longURL string) (string, bool, error) {
+	if url, b := m.repo.FindByLongURL(ctx, longURL); b {
 		return url.ShortURL, false, nil
 	}
-	key, b := m.getUniqueKey(longURL, 0)
+	key, b := m.getUniqueKey(ctx, longURL, 0)
 	if !b {
 		return "", false, fmt.Errorf("short url already exists")
 	}
-	url, err := m.repo.Save(key, longURL)
+	url, err := m.repo.Save(ctx, key, longURL)
 	if err != nil {
 		return "", false, fmt.Errorf("failed to save url: %s", longURL)
 	}
@@ -36,22 +37,22 @@ func (m *URLManager) TryCreateShortURL(longURL string) (string, bool, error) {
 
 }
 
-func (m *URLManager) GetURL(shortURL string) (*model.URL, error) {
-	url, b := m.repo.FindByShortURL(shortURL)
+func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.URL, error) {
+	url, b := m.repo.FindByShortURL(ctx, shortURL)
 	if !b {
 		return nil, fmt.Errorf("short url not found")
 	}
 	return url, nil
 }
 
-func (m *URLManager) getUniqueKey(longURL string, count int) (string, bool) {
+func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int) (string, bool) {
 	if count > 100 {
 		return "", false
 	}
 	key := GenerateRandomString(5)
-	_, ok := m.repo.FindByShortURL(key)
+	_, ok := m.repo.FindByShortURL(ctx, key)
 	if ok {
-		m.getUniqueKey(longURL, count)
+		m.getUniqueKey(ctx, longURL, count)
 	}
 	return key, true
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -10,13 +11,15 @@ import (
 
 func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
 		b, err := io.ReadAll(r.Body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
-		su, exs, err := manager.TryCreateShortURL(string(b))
+		su, exs, err := manager.TryCreateShortURL(ctx, string(b))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -35,7 +38,9 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 
 func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s, err := manager.GetURL(r.PathValue("id"))
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		s, err := manager.GetURL(ctx, r.PathValue("id"))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
