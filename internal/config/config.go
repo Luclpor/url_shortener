@@ -1,9 +1,13 @@
 package config
 
-import "time"
+import (
+	"flag"
+	"time"
+)
 
 type Config struct {
 	HTTPServer
+	BaseAddressShort string
 }
 
 type HTTPServer struct {
@@ -13,12 +17,18 @@ type HTTPServer struct {
 }
 
 func InitConfig() *Config {
+	h := flag.String("a", "localhost:8080", "host address server")
+	b := flag.String("b", "localhost:8080", "base url for short url")
+
+	flag.Parse()
+
 	cfg := &Config{
 		HTTPServer: HTTPServer{
-			Host:        "localhost:8080",
+			Host:        *h,
 			Timeout:     time.Second * 4,
 			IdleTimeout: time.Second * 30,
 		},
+		BaseAddressShort: *b,
 	}
 	return cfg
 }

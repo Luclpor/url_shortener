@@ -9,8 +9,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter() *chi.Mux {
-	cfg := config.InitConfig()
+func NewRouter(cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)

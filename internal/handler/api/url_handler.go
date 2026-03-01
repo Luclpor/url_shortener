@@ -25,7 +25,7 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 			w.WriteHeader(http.StatusOK)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte("http://" + cfg.Host + "/" + su))
+		_, err = w.Write([]byte("http://" + cfg.BaseAddressShort + "/" + su))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
