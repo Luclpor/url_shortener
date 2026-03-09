@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -39,15 +40,15 @@ func TestURLManager_GetURL(t *testing.T) {
 		},
 	}
 	mockRep := mocks.NewURLRepoMock()
-	mockRep.Save("gle", "https://google.com")
-	mockRep.Save("ya", "http://test2.com")
+	mockRep.Save(context.Background(), "gle", "https://google.com")
+	mockRep.Save(context.Background(), "ya", "http://test2.com")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			manager := &URLManager{
 				repo: mockRep,
 			}
-			got, err := manager.GetURL(tt.args.shortURL)
+			got, err := manager.GetURL(context.Background(), tt.args.shortURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -68,8 +69,8 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 	}
 
 	mockRep := mocks.NewURLRepoMock()
-	_, _ = mockRep.Save("gle", "https://google.com")
-	_, _ = mockRep.Save("ya", "http://test2.com")
+	_, _ = mockRep.Save(context.Background(), "gle", "https://google.com")
+	_, _ = mockRep.Save(context.Background(), "ya", "http://test2.com")
 
 	tests := []struct {
 		name        string
@@ -111,7 +112,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				repo: tt.fields.repo,
 			}
 
-			got, created, err := m.TryCreateShortURL(tt.args.longURL)
+			got, created, err := m.TryCreateShortURL(context.Background(), tt.args.longURL)
 
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("TryCreateShortURL() error = %v, wantErr %v", err, tt.wantErr)
@@ -135,7 +136,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				t.Fatalf("TryCreateShortURL() got length = %d, want %d (generated key length)", len(got), 5)
 			}
 
-			saved, ok := mockRep.FindByShortURL(got)
+			saved, ok := mockRep.FindByShortURL(context.Background(), got)
 			if !ok || saved == nil {
 				t.Fatalf("expected repo to contain saved short %q", got)
 			}
