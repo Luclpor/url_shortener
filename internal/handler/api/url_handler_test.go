@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +52,7 @@ func TestCreatedShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockRep := mocks.NewURLRepoMock()
-			_, _ = mockRep.Save("gle", "https://www.google.com")
+			_, _ = mockRep.Save(context.Background(), "gle", "https://www.google.com")
 
 			manager := service.NewURLManager(mockRep)
 			createHandler := NewCreateHandler(cfg, manager)
@@ -111,7 +112,7 @@ func TestGetShortURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// полностью детерминируем: кладём запись заранее, чтобы не зависеть от генератора
 			mockRep := mocks.NewURLRepoMock()
-			_, _ = mockRep.Save("gle", "https://www.google.com")
+			_, _ = mockRep.Save(context.Background(), "gle", "https://www.google.com")
 
 			manager := service.NewURLManager(mockRep)
 			getHandler := NewGetterHandler(manager)

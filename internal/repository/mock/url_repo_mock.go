@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"context"
 	"sync"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
@@ -23,7 +24,7 @@ func NewURLRepoMock() *URLRepoMock {
 	}
 }
 
-func (r *URLRepoMock) FindByShortURL(short string) (*model.URL, bool) {
+func (r *URLRepoMock) FindByShortURL(_ context.Context, short string) (*model.URL, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -35,7 +36,7 @@ func (r *URLRepoMock) FindByShortURL(short string) (*model.URL, bool) {
 	return &u, true
 }
 
-func (r *URLRepoMock) FindByLongURL(full string) (*model.URL, bool) {
+func (r *URLRepoMock) FindByLongURL(_ context.Context, full string) (*model.URL, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -47,7 +48,7 @@ func (r *URLRepoMock) FindByLongURL(full string) (*model.URL, bool) {
 	return &u, true
 }
 
-func (r *URLRepoMock) Save(shortURL, fullURL string) (*model.URL, error) {
+func (r *URLRepoMock) Save(_ context.Context, shortURL, fullURL string) (*model.URL, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
