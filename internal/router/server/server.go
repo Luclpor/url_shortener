@@ -28,7 +28,7 @@ func NewServer() *Server {
 
 	server := &Server{
 		&http.Server{
-			Addr:         cfg.Host,
+			Addr:         cfg.ServerAddress,
 			Handler:      router,
 			ReadTimeout:  cfg.Timeout,
 			WriteTimeout: cfg.Timeout,

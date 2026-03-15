@@ -7,6 +7,8 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 )
 
+//go:generate mockgen -source=url_manager.go -destination=mock/mock_user_repository.go -package=mock
+
 type URLRepository interface {
 	FindByShortURL(ctx context.Context, shortURL string) (*model.URL, bool)
 	FindByLongURL(ctx context.Context, longURL string) (*model.URL, bool)

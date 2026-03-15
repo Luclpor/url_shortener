@@ -2,7 +2,10 @@ package config
 
 import (
 	"flag"
+	"log"
 	"time"
+
+	"github.com/caarlos0/env/v6"
 )
 
 type Config struct {
@@ -11,24 +14,31 @@ type Config struct {
 }
 
 type HTTPServer struct {
-	Host        string
-	Timeout     time.Duration
-	IdleTimeout time.Duration
+	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
+	BaseURL       string `env:"BASE_URL" default:"http://localhost:9090"`
+	Timeout       time.Duration
+	IdleTimeout   time.Duration
 }
 
 func InitConfig() *Config {
-	h := flag.String("a", "localhost:8080", "host address server")
+	h := flag.String("a", "localhost:7999", "host address server")
 	b := flag.String("b", "http://localhost:8080", "base url for short url")
 
 	flag.Parse()
 
-	cfg := &Config{
+	cfg := Config{
 		HTTPServer: HTTPServer{
-			Host:        *h,
-			Timeout:     time.Second * 4,
-			IdleTimeout: time.Second * 30,
+			ServerAddress: *h,
+			Timeout:       time.Second * 4,
+			IdleTimeout:   time.Second * 30,
 		},
 		BaseAddressShort: *b,
 	}
-	return cfg
+
+	err := env.Parse(&cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return &cfg
 }

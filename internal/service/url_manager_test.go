@@ -7,6 +7,8 @@ import (
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	mocks "github.com/Luclpor/url_shortener.git/internal/repository/mock"
+	"github.com/Luclpor/url_shortener.git/internal/service/mock"
+	"go.uber.org/mock/gomock"
 )
 
 func TestURLManager_GetURL(t *testing.T) {
@@ -39,12 +41,29 @@ func TestURLManager_GetURL(t *testing.T) {
 			wantErr: true,
 		},
 	}
-	mockRep := mocks.NewURLRepoMock()
-	mockRep.Save(context.Background(), "gle", "https://google.com")
-	mockRep.Save(context.Background(), "ya", "http://test2.com")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+			mockRep := mock.NewMockURLRepository(ctrl)
+
+			var res *model.URL
+			if tt.want != nil {
+				res = &model.URL{
+					ShortURL: tt.want.ShortURL,
+					FullURL:  tt.want.FullURL,
+				}
+			}
+
+			var b = false
+			if res != nil {
+				b = true
+			}
+
+			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
+				Return(res, b)
+
 			manager := &URLManager{
 				repo: mockRep,
 			}
