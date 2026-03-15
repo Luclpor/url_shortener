@@ -14,14 +14,14 @@ type Config struct {
 }
 
 type HTTPServer struct {
-	ServerAddress string `env:"SERVER_ADDRESS" envDefault:":8080"`
-	BaseURL       string `env:"BASE_URL" default:"http://localhost:9090"`
+	ServerAddress string `env:"SERVER_ADDRESS"`
+	BaseURL       string `env:"BASE_URL"`
 	Timeout       time.Duration
 	IdleTimeout   time.Duration
 }
 
 func InitConfig() *Config {
-	h := flag.String("a", "localhost:7999", "host address server")
+	h := flag.String("a", "localhost:8080", "host address server")
 	b := flag.String("b", "http://localhost:8080", "base url for short url")
 
 	flag.Parse()
