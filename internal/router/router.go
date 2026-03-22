@@ -3,6 +3,7 @@ package router
 import (
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/handler/api"
+	"github.com/Luclpor/url_shortener.git/internal/handler/custom_middleware"
 	"github.com/Luclpor/url_shortener.git/internal/logger"
 	"github.com/Luclpor/url_shortener.git/internal/repository"
 	"github.com/Luclpor/url_shortener.git/internal/service"
@@ -16,6 +17,7 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 	r.Use(middleware.RequestID)
 	r.Use(logger.RequestLogger)
 	r.Use(middleware.Recoverer)
+	r.Use(custom_middleware.CompressMiddleware)
 
 	repo := repository.NewRepository()
 	manager := service.NewURLManager(repo)
