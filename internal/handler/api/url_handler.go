@@ -24,7 +24,7 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 		}
 		w.Header().Set("Content-Type", "application/json")
 		responseModel, exs, err := manager.TryCreateShortURL(ctx, model.URL)
-		responseModel.ShortenURL = cfg.BaseAddressShort + "/" + responseModel.ShortenURL
+		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
 		if err != nil {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
@@ -56,7 +56,7 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 			w.WriteHeader(http.StatusOK)
 		}
 		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte(cfg.BaseAddressShort + "/" + su.ShortenURL))
+		_, err = w.Write([]byte(cfg.BaseAddressShort + "/" + su.Result))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return

@@ -26,7 +26,7 @@ func NewURLManager(repo URLRepository) *URLManager {
 
 func (m *URLManager) TryCreateShortURL(ctx context.Context, longURL string) (*api.ShortenResp, bool, error) {
 	if url, b := m.repo.FindByLongURL(ctx, longURL); b {
-		return &api.ShortenResp{ShortenURL: url.ShortURL}, false, nil
+		return &api.ShortenResp{Result: url.ShortURL}, false, nil
 	}
 	key, b := m.getUniqueKey(ctx, longURL, 0)
 	if !b {
@@ -36,7 +36,7 @@ func (m *URLManager) TryCreateShortURL(ctx context.Context, longURL string) (*ap
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to save url: %s", longURL)
 	}
-	return &api.ShortenResp{ShortenURL: url.ShortURL}, true, nil
+	return &api.ShortenResp{Result: url.ShortURL}, true, nil
 
 }
 
