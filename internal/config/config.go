@@ -11,6 +11,7 @@ import (
 type Config struct {
 	HTTPServer
 	BaseAddressShort string
+	FileStoragePath  string `env:"FILE_STORAGE_PATH"`
 }
 
 type HTTPServer struct {
@@ -23,6 +24,7 @@ type HTTPServer struct {
 func InitConfig() *Config {
 	h := flag.String("a", "localhost:8080", "host address server")
 	b := flag.String("b", "http://localhost:8080", "base url for short url")
+	f := flag.String("f", "shortenest_url.txt", "file storage path")
 
 	flag.Parse()
 
@@ -33,6 +35,7 @@ func InitConfig() *Config {
 			IdleTimeout:   time.Second * 30,
 		},
 		BaseAddressShort: *b,
+		FileStoragePath:  *f,
 	}
 
 	err := env.Parse(&cfg)

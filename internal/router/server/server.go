@@ -24,7 +24,10 @@ type Server struct {
 
 func NewServer() *Server {
 	cfg := config.InitConfig()
-	router := router2.NewRouter(cfg)
+	router, err := router2.NewRouter(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	server := &Server{
 		&http.Server{

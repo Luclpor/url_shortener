@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(cfg *config.Config) *chi.Mux {
+func NewRouter(cfg *config.Config) (*chi.Mux, error) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -19,12 +19,15 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(customMidlleware.CompressMiddleware)
 
-	repo := repository.NewRepository()
+	repo, err := repository.NewRepository(cfg.FileStoragePath)
+	if err != nil {
+		return nil, err
+	}
 	manager := service.NewURLManager(repo)
 
 	r.Post("/api/shorten", api.NewCreateShortenUlrJSONHandler(cfg, manager))
 	r.Post("/", api.NewCreateHandler(cfg, manager))
 	r.Get("/{id}", api.NewGetterHandler(manager))
 
-	return r
+	return r, nil
 }
