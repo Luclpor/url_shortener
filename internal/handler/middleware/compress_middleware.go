@@ -9,6 +9,7 @@ import (
 type compressWriter struct {
 	http.ResponseWriter
 	writer      *gzip.Writer
+	useGzip     bool
 	wroteHeader bool
 }
 
@@ -16,8 +17,11 @@ func (cw *compressWriter) WriteHeader(statusCode int) {
 	if !cw.wroteHeader {
 		cw.wroteHeader = true
 		headers := cw.Header()
-		headers.Set("Content-Encoding", "gzip")
-		headers.Del("Content-Length")
+		contentType := headers.Get("Content-Type")
+		if strings.Contains(contentType, "application/json") {
+			headers.Set("Content-Encoding", "gzip")
+			headers.Del("Content-Length")
+		}
 	}
 	cw.ResponseWriter.WriteHeader(statusCode)
 }
@@ -26,7 +30,10 @@ func (cw *compressWriter) Write(data []byte) (int, error) {
 	if !cw.wroteHeader {
 		cw.WriteHeader(http.StatusOK)
 	}
-	return cw.writer.Write(data)
+	if cw.useGzip {
+		return cw.writer.Write(data)
+	}
+	return cw.ResponseWriter.Write(data)
 }
 
 func CompressMiddleware(next http.Handler) http.Handler {
