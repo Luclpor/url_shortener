@@ -17,9 +17,10 @@ func (cw *compressWriter) Write(bt []byte) (int, error) {
 
 func CompressMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		typeContent := r.Header.Get("Content-Type")
 		acceptEncoding := r.Header.Get("Accept-Encoding")
 		supportsGzip := strings.Contains(acceptEncoding, "gzip")
-		if supportsGzip {
+		if supportsGzip && strings.Contains(typeContent, "application/json") {
 			gW, err := gzip.NewWriterLevel(w, gzip.BestCompression)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
