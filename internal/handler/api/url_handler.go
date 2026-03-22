@@ -16,23 +16,26 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
-		var model *api.CreateShortenReq
+		var model api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
 		if err != nil {
 			render.Status(r, http.StatusBadRequest)
 			render.JSON(w, r, err)
+			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, exs, err := manager.TryCreateShortURL(ctx, model.URL)
-		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
+		responseModel, created, err := manager.TryCreateShortURL(ctx, model.URL)
 		if err != nil {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
+			return
 		}
-		if !exs {
+		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
+		if !created {
 			render.Status(r, http.StatusOK)
+		} else {
+			render.Status(r, http.StatusCreated)
 		}
-		render.Status(r, http.StatusCreated)
 		render.JSON(w, r, responseModel)
 	}
 }
