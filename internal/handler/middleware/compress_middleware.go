@@ -9,17 +9,23 @@ import (
 type compressWriter struct {
 	http.ResponseWriter
 	writer      *gzip.Writer
+	useGzip     bool
 	wroteHeader bool
 }
 
 func (cw *compressWriter) WriteHeader(statusCode int) {
-	if !cw.wroteHeader {
-		cw.wroteHeader = true
-		headers := cw.Header()
-		headers.Set("Content-Encoding", "gzip")
-		headers.Add("Vary", "Accept-Encoding")
-		headers.Del("Content-Length")
+	if cw.wroteHeader {
+		return
 	}
+	cw.wroteHeader = true
+
+	contentType := cw.Header().Get("Content-Type")
+	if strings.Contains(contentType, "application/json") {
+		cw.useGzip = true
+		cw.Header().Set("Content-Encoding", "gzip")
+		cw.Header().Del("Content-Length")
+	}
+
 	cw.ResponseWriter.WriteHeader(statusCode)
 }
 
@@ -27,7 +33,12 @@ func (cw *compressWriter) Write(data []byte) (int, error) {
 	if !cw.wroteHeader {
 		cw.WriteHeader(http.StatusOK)
 	}
-	return cw.writer.Write(data)
+
+	if cw.useGzip {
+		return cw.writer.Write(data)
+	}
+
+	return cw.ResponseWriter.Write(data)
 }
 
 func CompressMiddleware(next http.Handler) http.Handler {
@@ -35,28 +46,30 @@ func CompressMiddleware(next http.Handler) http.Handler {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			rc, err := gzip.NewReader(r.Body)
 			if err != nil {
-				http.Error(w, "invalid gzip body", http.StatusBadRequest)
+				http.Error(w, "invalid gzip request body", http.StatusBadRequest)
 				return
 			}
 			defer rc.Close()
 			r.Body = rc
 		}
 
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			gw, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
-			if err != nil {
-				http.Error(w, "failed to init gzip writer", http.StatusInternalServerError)
-				return
-			}
-			defer gw.Close()
-
-			cw := &compressWriter{
-				ResponseWriter: w,
-				writer:         gw,
-			}
-			w = cw
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
 		}
 
-		next.ServeHTTP(w, r)
+		gw, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
+		if err != nil {
+			http.Error(w, "failed to init gzip writer", http.StatusInternalServerError)
+			return
+		}
+		defer gw.Close()
+
+		cw := &compressWriter{
+			ResponseWriter: w,
+			writer:         gw,
+		}
+
+		next.ServeHTTP(cw, r)
 	})
 }
