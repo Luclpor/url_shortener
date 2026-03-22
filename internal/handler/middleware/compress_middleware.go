@@ -8,21 +8,31 @@ import (
 
 type compressWriter struct {
 	http.ResponseWriter
-	writer      *gzip.Writer
-	useGzip     bool
-	wroteHeader bool
+	writer       *gzip.Writer
+	supportsGzip bool
+	useGzip      bool
+	wroteHeader  bool
 }
 
 func (cw *compressWriter) WriteHeader(statusCode int) {
-	if !cw.wroteHeader {
-		cw.wroteHeader = true
-		headers := cw.Header()
+	if cw.wroteHeader {
+		return
+	}
+	cw.wroteHeader = true
+
+	headers := cw.Header()
+
+	if cw.supportsGzip {
 		contentType := headers.Get("Content-Type")
-		if strings.Contains(contentType, "application/json") {
+		if strings.Contains(contentType, "application/json") || strings.Contains(contentType, "text/html") {
+			cw.useGzip = true
 			headers.Set("Content-Encoding", "gzip")
 			headers.Del("Content-Length")
+
+			cw.writer = gzip.NewWriter(cw.ResponseWriter)
 		}
 	}
+
 	cw.ResponseWriter.WriteHeader(statusCode)
 }
 
@@ -30,10 +40,19 @@ func (cw *compressWriter) Write(data []byte) (int, error) {
 	if !cw.wroteHeader {
 		cw.WriteHeader(http.StatusOK)
 	}
+
 	if cw.useGzip {
 		return cw.writer.Write(data)
 	}
+
 	return cw.ResponseWriter.Write(data)
+}
+
+func (cw *compressWriter) Close() error {
+	if cw.writer != nil {
+		return cw.writer.Close()
+	}
+	return nil
 }
 
 func CompressMiddleware(next http.Handler) http.Handler {
@@ -48,21 +67,12 @@ func CompressMiddleware(next http.Handler) http.Handler {
 			r.Body = rc
 		}
 
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			gw, err := gzip.NewWriterLevel(w, gzip.DefaultCompression)
-			if err != nil {
-				http.Error(w, "failed to init gzip writer", http.StatusInternalServerError)
-				return
-			}
-			defer gw.Close()
-
-			cw := &compressWriter{
-				ResponseWriter: w,
-				writer:         gw,
-			}
-			w = cw
+		cw := &compressWriter{
+			ResponseWriter: w,
+			supportsGzip:   strings.Contains(r.Header.Get("Accept-Encoding"), "gzip"),
 		}
+		defer cw.Close()
 
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(cw, r)
 	})
 }
