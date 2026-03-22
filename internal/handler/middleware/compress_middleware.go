@@ -17,7 +17,6 @@ func (cw *compressWriter) WriteHeader(statusCode int) {
 		cw.wroteHeader = true
 		headers := cw.Header()
 		headers.Set("Content-Encoding", "gzip")
-		headers.Add("Vary", "Accept-Encoding")
 		headers.Del("Content-Length")
 	}
 	cw.ResponseWriter.WriteHeader(statusCode)
