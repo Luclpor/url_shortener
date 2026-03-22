@@ -20,6 +20,7 @@ func NewRouter(cfg *config.Config) *chi.Mux {
 	repo := repository.NewRepository()
 	manager := service.NewURLManager(repo)
 
+	r.Post("/api/shorten", api.NewCreateShortenUlrJSONHandler(cfg, manager))
 	r.Post("/", api.NewCreateHandler(cfg, manager))
 	r.Get("/{id}", api.NewGetterHandler(manager))
 
