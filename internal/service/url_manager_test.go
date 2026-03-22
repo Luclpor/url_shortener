@@ -142,7 +142,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			}
 
 			if !tt.wantCreated {
-				if got.ShortenURL != tt.want {
+				if got.Result != tt.want {
 					t.Fatalf("TryCreateShortURL() got = %q, want %q", got, tt.want)
 				}
 				return
@@ -151,11 +151,11 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			if got == nil {
 				t.Fatalf("TryCreateShortURL() got is empty, expected generated short")
 			}
-			if len(got.ShortenURL) != 5 {
-				t.Fatalf("TryCreateShortURL() got length = %d, want %d (generated key length)", len(got.ShortenURL), 5)
+			if len(got.Result) != 5 {
+				t.Fatalf("TryCreateShortURL() got length = %d, want %d (generated key length)", len(got.Result), 5)
 			}
 
-			saved, ok := mockRep.FindByShortURL(context.Background(), got.ShortenURL)
+			saved, ok := mockRep.FindByShortURL(context.Background(), got.Result)
 			if !ok || saved == nil {
 				t.Fatalf("expected repo to contain saved short %q", got)
 			}
