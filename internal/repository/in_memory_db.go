@@ -11,7 +11,7 @@ import (
 )
 
 type InMemoryDB struct {
-	m       sync.Mutex
+	mu      sync.Mutex
 	urls    []model.URL
 	file    *os.File
 	encoder *json.Encoder
@@ -47,8 +47,8 @@ func NewRepository(filePath string) (*InMemoryDB, error) {
 }
 
 func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model.URL, bool) {
-	db.m.Lock()
-	defer db.m.Unlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
 	for i := range db.urls {
 		if db.urls[i].ShortURL == shortURL {
@@ -59,8 +59,8 @@ func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model
 }
 
 func (db *InMemoryDB) FindByLongURL(_ context.Context, longURL string) (*model.URL, bool) {
-	db.m.Lock()
-	defer db.m.Unlock()
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
 	for i := range db.urls {
 		if db.urls[i].FullURL == longURL {
@@ -70,9 +70,9 @@ func (db *InMemoryDB) FindByLongURL(_ context.Context, longURL string) (*model.U
 	return nil, false
 }
 
-func (db *InMemoryDB) Save(_ context.Context, shortURL string, fullURL string) (*model.URL, error) {
-	db.m.Lock()
-	defer db.m.Unlock()
+func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.URL, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
 	u := model.URL{
 		ShortURL: shortURL,

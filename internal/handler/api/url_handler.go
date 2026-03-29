@@ -3,12 +3,14 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
 )
 
@@ -24,14 +26,14 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, created, err := manager.TryCreateShortURL(ctx, model.URL)
-		if err != nil {
+		responseModel, err := manager.CreateShortURL(ctx, model.URL)
+		if err != nil && !errors.Is(err, errors2.ErrAlreadyExists) {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
 			return
 		}
 		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
-		if !created {
+		if err != nil && errors.Is(err, errors2.ErrAlreadyExists) {
 			render.Status(r, http.StatusOK)
 		} else {
 			render.Status(r, http.StatusCreated)
@@ -50,12 +52,12 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 			return
 		}
 		w.Header().Set("Content-Type", "text/plain")
-		su, exs, err := manager.TryCreateShortURL(ctx, string(b))
-		if err != nil {
+		su, err := manager.CreateShortURL(ctx, string(b))
+		if err != nil && !errors.Is(err, errors2.ErrAlreadyExists) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if !exs {
+		if err != nil && errors.Is(err, errors2.ErrAlreadyExists) {
 			w.WriteHeader(http.StatusOK)
 		}
 		w.WriteHeader(http.StatusCreated)

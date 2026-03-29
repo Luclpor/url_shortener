@@ -29,7 +29,7 @@ func (cw *compressWriter) WriteHeader(statusCode int) {
 			headers.Set("Content-Encoding", "gzip")
 			headers.Del("Content-Length")
 
-			cw.writer = gzip.NewWriter(cw.ResponseWriter)
+			cw.writer, _ = gzip.NewWriterLevel(cw.ResponseWriter, gzip.BestSpeed)
 		}
 	}
 

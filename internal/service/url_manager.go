@@ -6,6 +6,7 @@ import (
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
+	"github.com/Luclpor/url_shortener.git/pkg/errors"
 )
 
 //go:generate mockgen -source=url_manager.go -destination=mock/mock_user_repository.go -package=mock
@@ -24,19 +25,19 @@ func NewURLManager(repo URLRepository) *URLManager {
 	return &URLManager{repo: repo}
 }
 
-func (m *URLManager) TryCreateShortURL(ctx context.Context, longURL string) (*api.ShortenResp, bool, error) {
+func (m *URLManager) CreateShortURL(ctx context.Context, longURL string) (*api.ShortenResp, error) {
 	if url, b := m.repo.FindByLongURL(ctx, longURL); b {
-		return &api.ShortenResp{Result: url.ShortURL}, false, nil
+		return &api.ShortenResp{Result: url.ShortURL}, errors.ErrAlreadyExists
 	}
 	key, b := m.getUniqueKey(ctx, longURL, 0)
 	if !b {
-		return nil, false, fmt.Errorf("short url already exists")
+		return nil, fmt.Errorf("short url already exists")
 	}
 	url, err := m.repo.Save(ctx, key, longURL)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to save url: %s", longURL)
+		return nil, fmt.Errorf("failed to save url: %s", longURL)
 	}
-	return &api.ShortenResp{Result: url.ShortURL}, true, nil
+	return &api.ShortenResp{Result: url.ShortURL}, nil
 
 }
 
