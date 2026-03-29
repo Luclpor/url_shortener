@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
+	"github.com/Luclpor/url_shortener.git/internal/repository"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
+	"github.com/Luclpor/url_shortener.git/internal/service"
 )
 
 const (
@@ -24,11 +26,19 @@ type Server struct {
 
 func NewServer() *Server {
 	cfg := config.InitConfig()
-	router := router2.NewRouter(cfg)
+	repo, err := repository.NewRepository(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	manager := service.NewURLManager(repo)
+	router, err := router2.NewRouter(cfg, manager)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	server := &Server{
 		&http.Server{
-			Addr:         cfg.Host,
+			Addr:         cfg.ServerAddress,
 			Handler:      router,
 			ReadTimeout:  cfg.Timeout,
 			WriteTimeout: cfg.Timeout,
