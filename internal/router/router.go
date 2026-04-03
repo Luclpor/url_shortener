@@ -10,7 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func NewRouter(cfg *config.Config, manager *service.URLManager) (*chi.Mux, error) {
+func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService) (*chi.Mux, error) {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -21,6 +21,6 @@ func NewRouter(cfg *config.Config, manager *service.URLManager) (*chi.Mux, error
 	r.Post("/api/shorten", api.NewCreateShortenUlrJSONHandler(cfg, manager))
 	r.Post("/", api.NewCreateHandler(cfg, manager))
 	r.Get("/{id}", api.NewGetterHandler(manager))
-
+	r.Get("/ping", api.NewPingHandler(healthService))
 	return r, nil
 }

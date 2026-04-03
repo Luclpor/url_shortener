@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
-	"github.com/Luclpor/url_shortener.git/internal/repository"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/storage/in_memory"
+	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 )
 
 const (
@@ -22,16 +23,39 @@ const (
 
 type Server struct {
 	httpServer *http.Server
+	closers    []func() error
 }
 
 func NewServer() *Server {
 	cfg := config.InitConfig()
-	repo, err := repository.NewRepository(cfg.FileStoragePath)
-	if err != nil {
-		log.Fatal(err)
+
+	var repo service.URLRepository
+	var healthChecker service.HealthChecker
+	var closers []func() error
+	switch cfg.StorageType {
+	case "postgres":
+		pool, err := postgres.NewPool(context.Background(), cfg.DataBaseDSN)
+		if err != nil {
+			log.Fatal(err)
+		}
+		repo = postgres.NewURLRepository(pool)
+		healthChecker = postgres.NewHealthRepository(pool)
+		closers = append(closers, func() error {
+			pool.Close()
+			return nil
+		})
+	default:
+		memRepo, err := in_memory.NewRepository(cfg.FileStoragePath)
+		healthChecker = in_memory.NewHealthRepository()
+		if err != nil {
+			log.Fatal(err)
+		}
+		repo = memRepo
+		closers = append(closers, memRepo.Close)
 	}
+	healthService := service.NewHealthService(healthChecker)
 	manager := service.NewURLManager(repo)
-	router, err := router2.NewRouter(cfg, manager)
+	router, err := router2.NewRouter(cfg, manager, healthService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -44,6 +68,7 @@ func NewServer() *Server {
 			WriteTimeout: cfg.Timeout,
 			IdleTimeout:  cfg.IdleTimeout,
 		},
+		closers,
 	}
 
 	return server
@@ -70,6 +95,10 @@ func (s *Server) Start() {
 	if err := s.httpServer.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
-
+	for _, closeFn := range s.closers {
+		if err := closeFn(); err != nil {
+			log.Printf("close error: %v", err)
+		}
+	}
 	log.Println("Server exited properly")
 }
