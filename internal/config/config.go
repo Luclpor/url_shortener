@@ -17,7 +17,7 @@ type Config struct {
 type HTTPServer struct {
 	ServerAddress string `env:"SERVER_ADDRESS"`
 	BaseURL       string `env:"BASE_URL"`
-	StorageType   string `env:"STORAGE_TYPE" envDefault:"postgres"`
+	StorageType   string `env:"STORAGE_TYPE" envDefault:"inmemory"`
 	DataBaseDSN   string `env:"DATABASE_DSN"`
 	Timeout       time.Duration
 	IdleTimeout   time.Duration
