@@ -13,7 +13,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/Luclpor/url_shortener.git/internal/storage/in_memory"
+	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 )
 
@@ -45,8 +45,8 @@ func NewServer() *Server {
 			return nil
 		})
 	default:
-		memRepo, err := in_memory.NewRepository(cfg.FileStoragePath)
-		healthChecker = in_memory.NewHealthRepository()
+		memRepo, err := inmemory.NewRepository(cfg.FileStoragePath)
+		healthChecker = inmemory.NewHealthRepository()
 		if err != nil {
 			log.Fatal(err)
 		}
