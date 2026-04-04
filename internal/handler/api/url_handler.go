@@ -78,7 +78,7 @@ func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		w.Header().Add("Location", s.FullURL)
+		w.Header().Add("Location", s.FullUrl)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }

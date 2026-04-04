@@ -21,12 +21,12 @@ func NewURLRepository(pool *pgxpool.Pool) *URLRepository {
 func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.URL, bool) {
 	const query = `
 		SELECT short_url, full_url
-		FROM urls
+		FROM url_shortener
 		WHERE short_url = $1
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.FullURL)
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.FullUrl)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -40,12 +40,12 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 func (r *URLRepository) FindByLongURL(ctx context.Context, longURL string) (*model.URL, bool) {
 	const query = `
 		SELECT short_url, full_url
-		FROM urls
+		FROM url_shortener
 		WHERE full_url = $1
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.FullURL)
+	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.FullUrl)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -58,13 +58,13 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL string) (*mod
 
 func (r *URLRepository) Save(ctx context.Context, shortURL string, fullURL string) (*model.URL, error) {
 	const query = `
-		INSERT INTO urls (short_url, full_url)
+		INSERT INTO url_shortener (short_url, full_url)
 		VALUES ($1, $2)
 		RETURNING short_url, full_url
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, shortURL, fullURL).Scan(&u.ShortURL, &u.FullURL)
+	err := r.pool.QueryRow(ctx, query, shortURL, fullURL).Scan(&u.ShortURL, &u.FullUrl)
 	if err != nil {
 		return nil, err
 	}

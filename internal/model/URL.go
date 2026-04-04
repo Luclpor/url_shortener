@@ -1,6 +1,6 @@
 package model
 
 type URL struct {
-	FullURL  string
+	FullUrl  string
 	ShortURL string
 }

@@ -32,8 +32,7 @@ func NewServer() *Server {
 	var repo service.URLRepository
 	var healthChecker service.HealthChecker
 	var closers []func() error
-	switch cfg.StorageType {
-	case "postgres":
+	if cfg.DataBaseDSN != "" {
 		pool, err := postgres.NewPool(context.Background(), cfg.DataBaseDSN)
 		if err != nil {
 			log.Fatal(err)
@@ -44,7 +43,7 @@ func NewServer() *Server {
 			pool.Close()
 			return nil
 		})
-	default:
+	} else {
 		memRepo, err := inmemory.NewRepository(cfg.FileStoragePath)
 		healthChecker = inmemory.NewHealthRepository()
 		if err != nil {
