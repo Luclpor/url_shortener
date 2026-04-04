@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -19,7 +20,11 @@ func RunMigrations(databaseURL string) error {
 	}
 	defer func() {
 		sourceErr, dbErr := m.Close()
-		if sourceErr != nil || dbErr != nil {
+		if sourceErr != nil {
+			log.Printf("close migrate source: %v", sourceErr)
+		}
+		if dbErr != nil {
+			log.Printf("close migrate db: %v", dbErr)
 		}
 	}()
 

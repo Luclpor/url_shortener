@@ -40,7 +40,10 @@ func NewServer() *Server {
 		}
 		repo = postgres.NewURLRepository(pool)
 		healthChecker = postgres.NewHealthRepository(pool)
-		db.RunMigrations(cfg.DataBaseDSN)
+		err = db.RunMigrations(cfg.DataBaseDSN)
+		if err != nil {
+			log.Fatal(err)
+		}
 		closers = append(closers, func() error {
 			pool.Close()
 			return nil
