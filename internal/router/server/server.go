@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
+	"github.com/Luclpor/url_shortener.git/internal/config/db"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
@@ -39,6 +40,7 @@ func NewServer() *Server {
 		}
 		repo = postgres.NewURLRepository(pool)
 		healthChecker = postgres.NewHealthRepository(pool)
+		db.RunMigrations(cfg.DataBaseDSN)
 		closers = append(closers, func() error {
 			pool.Close()
 			return nil
