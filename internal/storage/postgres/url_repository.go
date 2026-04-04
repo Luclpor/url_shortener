@@ -26,7 +26,7 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.FullUrl)
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.FullURL)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -45,7 +45,7 @@ func (r *URLRepository) FindByLongURL(ctx context.Context, longURL string) (*mod
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.FullUrl)
+	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.FullURL)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -64,7 +64,7 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, fullURL strin
 	`
 
 	var u model.URL
-	err := r.pool.QueryRow(ctx, query, shortURL, fullURL).Scan(&u.ShortURL, &u.FullUrl)
+	err := r.pool.QueryRow(ctx, query, shortURL, fullURL).Scan(&u.ShortURL, &u.FullURL)
 	if err != nil {
 		return nil, err
 	}

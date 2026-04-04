@@ -67,7 +67,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 					FindByLongURL(gomock.Any(), requestBody.URL).
 					Return(&model.URL{
 						ShortURL: "gle",
-						FullUrl:  requestBody.URL,
+						FullURL:  requestBody.URL,
 					}, true)
 			} else {
 				var generatedShortURL string
@@ -87,7 +87,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.URL{
 							ShortURL: shortURL,
-							FullUrl:  fullURL,
+							FullURL:  fullURL,
 						}, nil
 					})
 
@@ -174,7 +174,7 @@ func TestCreatedShortURL(t *testing.T) {
 					FindByLongURL(gomock.Any(), tt.body).
 					Return(&model.URL{
 						ShortURL: "gle",
-						FullUrl:  tt.body,
+						FullURL:  tt.body,
 					}, true)
 			} else {
 				var generatedShortURL string
@@ -194,7 +194,7 @@ func TestCreatedShortURL(t *testing.T) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.URL{
 							ShortURL: shortURL,
-							FullUrl:  fullURL,
+							FullURL:  fullURL,
 						}, nil
 					})
 
@@ -271,7 +271,7 @@ func TestGetShortURL(t *testing.T) {
 					FindByShortURL(gomock.Any(), tt.shortURL).
 					Return(&model.URL{
 						ShortURL: tt.shortURL,
-						FullUrl:  tt.want.location,
+						FullURL:  tt.want.location,
 					}, true)
 			} else {
 				mockRep.EXPECT().

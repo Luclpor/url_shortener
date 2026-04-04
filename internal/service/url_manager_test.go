@@ -31,7 +31,7 @@ func TestURLManager_GetURL(t *testing.T) {
 			},
 			want: &model.URL{
 				ShortURL: "gle",
-				FullUrl:  "https://google.com",
+				FullURL:  "https://google.com",
 			},
 			wantErr: false,
 		},
@@ -55,7 +55,7 @@ func TestURLManager_GetURL(t *testing.T) {
 			if tt.want != nil {
 				res = &model.URL{
 					ShortURL: tt.want.ShortURL,
-					FullUrl:  tt.want.FullUrl,
+					FullURL:  tt.want.FullURL,
 				}
 			}
 
@@ -148,7 +148,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 					if shortURL == tt.want.Result {
 						return &model.URL{
 							ShortURL: tt.want.Result,
-							FullUrl:  tt.args.longURL,
+							FullURL:  tt.args.longURL,
 						}, true
 					}
 					return nil, false
@@ -158,7 +158,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			if tt.alreadyExist {
 				mockRep.EXPECT().FindByLongURL(gomock.Any(), tt.args.longURL).Return(&model.URL{
 					ShortURL: tt.want.Result,
-					FullUrl:  tt.args.longURL,
+					FullURL:  tt.args.longURL,
 				}, true)
 			} else {
 				mockRep.EXPECT().FindByLongURL(gomock.Any(), tt.args.longURL).Return(nil, false)
@@ -168,7 +168,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 						if longURL == tt.args.longURL {
 							return &model.URL{
 								ShortURL: tt.want.Result,
-								FullUrl:  tt.args.longURL,
+								FullURL:  tt.args.longURL,
 							}, nil
 						}
 						return nil, fmt.Errorf("error")

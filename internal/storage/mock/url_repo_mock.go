@@ -32,7 +32,7 @@ func (r *URLRepoMock) FindByShortURL(_ context.Context, short string) (*model.UR
 	if !ok {
 		return nil, false
 	}
-	u := model.URL{ShortURL: short, FullUrl: full}
+	u := model.URL{ShortURL: short, FullURL: full}
 	return &u, true
 }
 
@@ -44,7 +44,7 @@ func (r *URLRepoMock) FindByLongURL(_ context.Context, full string) (*model.URL,
 	if !ok {
 		return nil, false
 	}
-	u := model.URL{ShortURL: short, FullUrl: full}
+	u := model.URL{ShortURL: short, FullURL: full}
 	return &u, true
 }
 
@@ -56,6 +56,6 @@ func (r *URLRepoMock) Save(_ context.Context, shortURL, fullURL string) (*model.
 	r.ByShort[shortURL] = fullURL
 	r.ByFull[fullURL] = shortURL
 
-	u := model.URL{ShortURL: shortURL, FullUrl: fullURL}
+	u := model.URL{ShortURL: shortURL, FullURL: fullURL}
 	return &u, nil
 }

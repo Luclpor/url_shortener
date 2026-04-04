@@ -63,7 +63,7 @@ func (db *InMemoryDB) FindByLongURL(_ context.Context, longURL string) (*model.U
 	defer db.mu.Unlock()
 
 	for i := range db.urls {
-		if db.urls[i].FullUrl == longURL {
+		if db.urls[i].FullURL == longURL {
 			return &db.urls[i], true
 		}
 	}
@@ -76,7 +76,7 @@ func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.
 
 	u := model.URL{
 		ShortURL: shortURL,
-		FullUrl:  fullURL,
+		FullURL:  fullURL,
 	}
 
 	if err := db.encoder.Encode(u); err != nil {
