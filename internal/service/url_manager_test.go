@@ -159,9 +159,9 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				mockRep.EXPECT().FindByOriginalURL(gomock.Any(), tt.args.longURL).Return(&model.ShortenURL{
 					ShortURL:    tt.want.Result,
 					OriginalURL: tt.args.longURL,
-				}, true)
+				}, errors2.ErrAlreadyExists)
 			} else {
-				mockRep.EXPECT().FindByOriginalURL(gomock.Any(), tt.args.longURL).Return(nil, false)
+				mockRep.EXPECT().FindByOriginalURL(gomock.Any(), tt.args.longURL).Return(nil, nil)
 				mockRep.EXPECT().
 					Save(gomock.Any(), gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ context.Context, shortURL string, longURL string) (*model.ShortenURL, error) {

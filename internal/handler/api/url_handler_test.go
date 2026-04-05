@@ -13,6 +13,7 @@ import (
 	modelapi "github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
 	storageMock "github.com/Luclpor/url_shortener.git/internal/storage/mock"
+	"github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -68,13 +69,13 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 					Return(&model.ShortenURL{
 						ShortURL:    "gle",
 						OriginalURL: requestBody.URL,
-					}, true)
+					}, errors.ErrAlreadyExists)
 			} else {
 				var generatedShortURL string
 
 				mockRep.EXPECT().
 					FindByOriginalURL(gomock.Any(), requestBody.URL).
-					Return(nil, false)
+					Return(nil, nil)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
@@ -175,13 +176,13 @@ func TestCreatedShortURL(t *testing.T) {
 					Return(&model.ShortenURL{
 						ShortURL:    "gle",
 						OriginalURL: tt.body,
-					}, true)
+					}, errors.ErrAlreadyExists)
 			} else {
 				var generatedShortURL string
 
 				mockRep.EXPECT().
 					FindByOriginalURL(gomock.Any(), tt.body).
-					Return(nil, false)
+					Return(nil, nil)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {

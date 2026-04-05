@@ -62,7 +62,7 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, fullURL strin
 	const query = `
 		INSERT INTO url_shortener (short_url, original_url)
 		VALUES ($1, $2)
-		RETURNING short_url, full_url
+		RETURNING short_url, original_url
 	`
 
 	var u model.ShortenURL
