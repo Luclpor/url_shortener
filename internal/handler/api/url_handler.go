@@ -37,7 +37,7 @@ func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManage
 			return
 		}
 		render.Status(r, http.StatusCreated)
-		for i, _ := range responseModel {
+		for i := range responseModel {
 			responseModel[i].ShortURL = cfg.BaseAddressShort + "/" + responseModel[i].ShortURL
 		}
 		render.JSON(w, r, responseModel)
