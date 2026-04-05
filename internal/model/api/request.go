@@ -6,6 +6,6 @@ type CreateShortenReq struct {
 	URL           string `json:"url"`
 }
 
-type CreateShortURLBatchApiModel struct {
+type CreateShortURLBatchAPIModel struct {
 	URLs []CreateShortenReq `json:"urls"`
 }
