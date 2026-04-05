@@ -20,7 +20,7 @@ func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *s
 
 	r.Post("/api/shorten", api.NewCreateShortenUlrJSONHandler(cfg, manager))
 	r.Post("/", api.NewCreateHandler(cfg, manager))
-	r.Post("/api/shorten/batch", api.NewCreateBatchShortenHandler(manager))
+	r.Post("/api/shorten/batch", api.NewCreateBatchShortenHandler(cfg, manager))
 	r.Get("/{id}", api.NewGetterHandler(manager))
 	r.Get("/ping", api.NewPingHandler(healthService))
 	return r, nil

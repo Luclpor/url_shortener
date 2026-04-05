@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/render"
 )
 
-func NewCreateBatchShortenHandler(manager *service.URLManager) http.HandlerFunc {
+func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
@@ -37,6 +37,9 @@ func NewCreateBatchShortenHandler(manager *service.URLManager) http.HandlerFunc 
 			return
 		}
 		render.Status(r, http.StatusCreated)
+		for i, _ := range responseModel {
+			responseModel[i].ShortURL = cfg.BaseAddressShort + "/" + responseModel[i].ShortURL
+		}
 		render.JSON(w, r, responseModel)
 	}
 }
