@@ -47,6 +47,9 @@ func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string) (
 	`
 	var u model.ShortenURL
 	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, errors2.ErrNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

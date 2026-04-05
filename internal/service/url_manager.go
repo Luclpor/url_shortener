@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
+	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
 )
 
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
@@ -48,7 +50,7 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 	existsModels := make([]model.ShortenURL, 0)
 	for _, v := range apiModels {
 		existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL)
-		if err != nil {
+		if err != nil && !errors.Is(err, errors2.ErrNotFound) {
 			return nil, err
 		}
 		if existModel != nil {
