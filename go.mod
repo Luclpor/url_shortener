@@ -1,6 +1,6 @@
 module github.com/Luclpor/url_shortener.git
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/caarlos0/env/v6 v6.10.1
