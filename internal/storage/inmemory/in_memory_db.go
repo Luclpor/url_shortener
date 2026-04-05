@@ -89,7 +89,7 @@ func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.
 	return &u, nil
 }
 
-func (db *InMemoryDB) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
+func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	models := make([]model.ShortenURL, 0)
