@@ -49,9 +49,11 @@ func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*a
 
 func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq) ([]api.ShortenBatchResp, error) {
 	toAdd := make([]dto.URLDto, 0)
+	existsModels := make([]model.ShortenURL, 0)
 	for _, v := range apiModels {
-		if _, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL); err != nil {
+		if existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL); err != nil {
 			if errors.Is(err, errors2.ErrAlreadyExists) {
+				existsModels = append(existsModels, *existModel)
 				continue
 			} else {
 				return nil, err
@@ -68,12 +70,13 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 			CorrelationID: v.CorrelationID,
 		})
 	}
-	enities, err := m.repo.SaveBatch(ctx, toAdd)
+	entities, err := m.repo.SaveBatch(ctx, toAdd)
 	if err != nil {
 		return nil, err
 	}
-	batchResps := make([]api.ShortenBatchResp, len(enities))
-	for i, v := range enities {
+	entities = append(entities, existsModels...)
+	batchResps := make([]api.ShortenBatchResp, len(entities))
+	for i, v := range entities {
 		batchResps[i] = api.ShortenBatchResp{
 			ShortURL:      v.ShortURL,
 			CorrelationID: v.CorrelationID,

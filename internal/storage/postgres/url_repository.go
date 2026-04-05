@@ -41,13 +41,13 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 
 func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string) (*model.ShortenURL, error) {
 	const query = `
-		SELECT short_url, original_url
+		SELECT short_url, original_url, correlation_id
 		FROM url_shortener
 		WHERE original_url = $1
 	`
 
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.OriginalURL)
+	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
