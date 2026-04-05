@@ -7,7 +7,7 @@ import (
 )
 
 type ShortenURL struct {
-	Id            uuid.UUID
+	ID            uuid.UUID
 	CorrelationID string
 	OriginalURL   string
 	ShortURL      string

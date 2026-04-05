@@ -90,7 +90,7 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 		m := model.ShortenURL{}
 		err = tx.QueryRow(ctx, "batchSave", v.ShortURL, v.OriginalURL, v.CorrelationID).
 			Scan(
-				&m.Id,
+				&m.ID,
 				&m.ShortURL,
 				&m.OriginalURL,
 				&m.CorrelationID,
