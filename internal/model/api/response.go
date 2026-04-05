@@ -6,5 +6,5 @@ type ShortenResp struct {
 
 type ShortenBatchResp struct {
 	CorrelationID string `json:"correlationId"`
-	ShortURL      string `json:"shortUrl"`
+	ShortURL      string `json:"shortURL"`
 }
