@@ -18,6 +18,7 @@ func RequestLogger(h http.Handler) http.Handler {
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 		h.ServeHTTP(ww, r)
 		Logger.Info(fmt.Sprintf("%s %s %s", r.Method, r.URL, time.Since(start)))
+		Logger.Info(fmt.Sprintf("Request body %s.", r.Body))
 		defer func() {
 			Logger.Info(fmt.Sprintf("request completed response status %d, bytes size %d", ww.Status(), ww.BytesWritten()))
 		}()
