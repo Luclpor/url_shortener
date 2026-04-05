@@ -17,7 +17,7 @@ import (
 
 func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
 		var model []api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
@@ -47,7 +47,7 @@ func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManage
 
 func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
 		var model api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
@@ -102,7 +102,7 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 
 func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
 		s, err := manager.GetURL(ctx, r.PathValue("id"))
 		if err != nil {
