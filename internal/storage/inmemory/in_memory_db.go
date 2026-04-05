@@ -60,12 +60,12 @@ func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model
 	return nil, false
 }
 
-func (db *InMemoryDB) FindByOriginalURL(_ context.Context, longURL string) (*model.ShortenURL, error) {
+func (db *InMemoryDB) FindByOriginalURL(_ context.Context, originalURL string) (*model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	for i := range db.urls {
-		if db.urls[i].OriginalURL == longURL {
+		if db.urls[i].OriginalURL == originalURL {
 			return &db.urls[i], errors.ErrAlreadyExists
 		}
 	}
@@ -90,7 +90,22 @@ func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.
 }
 
 func (db *InMemoryDB) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
-	return nil, nil
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	models := make([]model.ShortenURL, 0)
+	for _, v := range dtos {
+		m := model.ShortenURL{
+			ShortURL:      v.ShortURL,
+			OriginalURL:   v.OriginalURL,
+			CorrelationID: v.CorrelationID,
+		}
+		if err := db.encoder.Encode(m); err != nil {
+			return nil, err
+		}
+		db.urls = append(db.urls, m)
+		models = append(models, m)
+	}
+	return models, nil
 }
 
 func (db *InMemoryDB) Close() error {

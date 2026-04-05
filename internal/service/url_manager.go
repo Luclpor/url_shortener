@@ -28,20 +28,20 @@ func NewURLManager(repo URLRepository) *URLManager {
 	return &URLManager{repo: repo}
 }
 
-func (m *URLManager) CreateShortURL(ctx context.Context, longURL string) (*api.ShortenResp, error) {
-	if url, err := m.repo.FindByOriginalURL(ctx, longURL); err != nil {
+func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*api.ShortenResp, error) {
+	if url, err := m.repo.FindByOriginalURL(ctx, originalURL); err != nil {
 		if errors.Is(err, errors2.ErrAlreadyExists) {
 			return &api.ShortenResp{Result: url.ShortURL}, errors2.ErrAlreadyExists
 		}
 		return nil, err
 	}
-	key, b := m.getUniqueKey(ctx, longURL, 0)
+	key, b := m.getUniqueKey(ctx, originalURL, 0)
 	if !b {
 		return nil, fmt.Errorf("short url already exists")
 	}
-	url, err := m.repo.Save(ctx, key, longURL)
+	url, err := m.repo.Save(ctx, key, originalURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to save url: %s", longURL)
+		return nil, fmt.Errorf("failed to save url: %s", originalURL)
 	}
 	return &api.ShortenResp{Result: url.ShortURL}, nil
 
@@ -50,7 +50,7 @@ func (m *URLManager) CreateShortURL(ctx context.Context, longURL string) (*api.S
 func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq) ([]api.ShortenBatchResp, error) {
 	toAdd := make([]dto.URLDto, 0)
 	for _, v := range apiModels {
-		if _, err := m.repo.FindByOriginalURL(ctx, v.URL); err != nil {
+		if _, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL); err != nil {
 			if errors.Is(err, errors2.ErrAlreadyExists) {
 				continue
 			} else {
@@ -59,11 +59,11 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 		}
 		var sURL string
 		var success bool
-		if sURL, success = m.getUniqueKey(ctx, v.URL, 0); !success {
+		if sURL, success = m.getUniqueKey(ctx, v.OriginalURL, 0); !success {
 			return nil, fmt.Errorf("short url already exists")
 		}
 		toAdd = append(toAdd, dto.URLDto{
-			OriginalURL:   v.URL,
+			OriginalURL:   v.OriginalURL,
 			ShortURL:      sURL,
 			CorrelationID: v.CorrelationID,
 		})
