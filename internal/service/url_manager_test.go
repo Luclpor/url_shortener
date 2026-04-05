@@ -156,12 +156,13 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				AnyTimes()
 
 			if tt.alreadyExist {
-				mockRep.EXPECT().FindByOriginalURL(gomock.Any(), tt.args.longURL).Return(&model.ShortenURL{
-					ShortURL:    tt.want.Result,
-					OriginalURL: tt.args.longURL,
-				}, errors2.ErrAlreadyExists)
+				mockRep.EXPECT().
+					Save(gomock.Any(), gomock.Any(), tt.args.longURL).
+					Return(&model.ShortenURL{
+						ShortURL:    tt.want.Result,
+						OriginalURL: tt.args.longURL,
+					}, errors2.ErrAlreadyExists)
 			} else {
-				mockRep.EXPECT().FindByOriginalURL(gomock.Any(), tt.args.longURL).Return(nil, nil)
 				mockRep.EXPECT().
 					Save(gomock.Any(), gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ context.Context, shortURL string, longURL string) (*model.ShortenURL, error) {
@@ -177,7 +178,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 
 			got, err := m.CreateShortURL(context.Background(), tt.args.longURL)
 			if tt.wantErr != nil {
-				assert.EqualError(t, err, tt.wantErr.Error())
+				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
 				assert.NoError(t, err)
 			}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
@@ -64,7 +65,7 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 		}
 		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
 		if err != nil && errors.Is(err, errors2.ErrAlreadyExists) {
-			render.Status(r, http.StatusOK)
+			render.Status(r, http.StatusConflict)
 		} else {
 			render.Status(r, http.StatusCreated)
 		}
@@ -74,28 +75,28 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 
 func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithCancel(r.Context())
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
-		b, err := io.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			render.Status(r, http.StatusBadRequest)
+			render.PlainText(w, r, http.StatusText(http.StatusBadRequest))
 			return
 		}
-		w.Header().Set("Content-Type", "text/plain")
-		su, err := manager.CreateShortURL(ctx, string(b))
-		if err != nil && !errors.Is(err, errors2.ErrAlreadyExists) {
-			w.WriteHeader(http.StatusInternalServerError)
+		su, createErr := manager.CreateShortURL(ctx, string(body))
+		if createErr != nil && !errors.Is(createErr, errors2.ErrAlreadyExists) {
+			render.Status(r, http.StatusInternalServerError)
+			render.PlainText(w, r, http.StatusText(http.StatusInternalServerError))
 			return
 		}
-		if err != nil && errors.Is(err, errors2.ErrAlreadyExists) {
-			w.WriteHeader(http.StatusOK)
+
+		if errors.Is(createErr, errors2.ErrAlreadyExists) {
+			render.Status(r, http.StatusConflict)
+		} else {
+			render.Status(r, http.StatusCreated)
 		}
-		w.WriteHeader(http.StatusCreated)
-		_, err = w.Write([]byte(cfg.BaseAddressShort + "/" + su.Result))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+
+		render.PlainText(w, r, cfg.BaseAddressShort+"/"+su.Result)
 	}
 }
 

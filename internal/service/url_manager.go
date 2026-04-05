@@ -2,13 +2,11 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
-	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
 )
 
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
@@ -29,21 +27,19 @@ func NewURLManager(repo URLRepository) *URLManager {
 }
 
 func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*api.ShortenResp, error) {
-	if url, err := m.repo.FindByOriginalURL(ctx, originalURL); err != nil {
-		if errors.Is(err, errors2.ErrAlreadyExists) {
-			return &api.ShortenResp{Result: url.ShortURL}, errors2.ErrAlreadyExists
-		}
-		return nil, err
-	}
+	var resultApiModel *api.ShortenResp
 	key, b := m.getUniqueKey(ctx, originalURL, 0)
 	if !b {
 		return nil, fmt.Errorf("short url already exists")
 	}
 	url, err := m.repo.Save(ctx, key, originalURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save url: %s", originalURL)
+	if url != nil {
+		resultApiModel = &api.ShortenResp{Result: url.ShortURL}
 	}
-	return &api.ShortenResp{Result: url.ShortURL}, nil
+	if err != nil {
+		return resultApiModel, fmt.Errorf("failed to save url: %s, err: %w", originalURL, err)
+	}
+	return resultApiModel, nil
 
 }
 
@@ -51,13 +47,13 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 	toAdd := make([]dto.URLDto, 0)
 	existsModels := make([]model.ShortenURL, 0)
 	for _, v := range apiModels {
-		if existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL); err != nil {
-			if errors.Is(err, errors2.ErrAlreadyExists) {
-				existsModels = append(existsModels, *existModel)
-				continue
-			} else {
-				return nil, err
-			}
+		existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL)
+		if err != nil {
+			return nil, err
+		}
+		if existModel != nil {
+			existsModels = append(existsModels, *existModel)
+			continue
 		}
 		var sURL string
 		var success bool
@@ -79,7 +75,7 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 	for i, v := range entities {
 		batchResps[i] = api.ShortenBatchResp{
 			ShortURL:      v.ShortURL,
-			CorrelationID: v.CorrelationID,
+			CorrelationID: *v.CorrelationID,
 		}
 	}
 	return batchResps, nil

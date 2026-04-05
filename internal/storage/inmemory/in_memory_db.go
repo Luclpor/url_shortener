@@ -97,7 +97,7 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 		m := model.ShortenURL{
 			ShortURL:      v.ShortURL,
 			OriginalURL:   v.OriginalURL,
-			CorrelationID: v.CorrelationID,
+			CorrelationID: &v.CorrelationID,
 		}
 		if err := db.encoder.Encode(m); err != nil {
 			return nil, err

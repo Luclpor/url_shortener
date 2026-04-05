@@ -8,7 +8,7 @@ import (
 
 type ShortenURL struct {
 	ID            uuid.UUID
-	CorrelationID string
+	CorrelationID *string
 	OriginalURL   string
 	ShortURL      string
 	CreatedAt     time.Time

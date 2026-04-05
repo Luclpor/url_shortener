@@ -35,7 +35,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			name: "already exist",
 			body: `{"url":"https://www.google.com"}`,
 			want: want{
-				code:        http.StatusOK,
+				code:        http.StatusConflict,
 				contentType: "application/json",
 				response:    "http://localhost:8080/gle",
 			},
@@ -64,18 +64,22 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.name == "already exist" {
-				mockRep.EXPECT().
-					FindByOriginalURL(gomock.Any(), requestBody.URL).
-					Return(&model.ShortenURL{
-						ShortURL:    "gle",
-						OriginalURL: requestBody.URL,
-					}, errors.ErrAlreadyExists)
+				gomock.InOrder(
+					mockRep.EXPECT().
+						FindByShortURL(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+							return nil, false
+						}),
+					mockRep.EXPECT().
+						Save(gomock.Any(), gomock.Any(), "https://www.google.com").
+						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+							return &model.ShortenURL{
+								ShortURL:    "gle",
+								OriginalURL: "https://www.google.com",
+							}, errors.ErrAlreadyExists
+						}))
 			} else {
 				var generatedShortURL string
-
-				mockRep.EXPECT().
-					FindByOriginalURL(gomock.Any(), requestBody.URL).
-					Return(nil, nil)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
@@ -146,7 +150,7 @@ func TestCreatedShortURL(t *testing.T) {
 			name: "already exist",
 			body: "https://www.google.com",
 			want: want{
-				code:        http.StatusOK,
+				code:        http.StatusConflict,
 				contentType: "text/plain",
 				response:    "http://localhost:8080/gle",
 			},
@@ -171,18 +175,23 @@ func TestCreatedShortURL(t *testing.T) {
 			mockRep := storageMock.NewMockURLRepository(ctrl)
 
 			if tt.name == "already exist" {
-				mockRep.EXPECT().
-					FindByOriginalURL(gomock.Any(), tt.body).
-					Return(&model.ShortenURL{
-						ShortURL:    "gle",
-						OriginalURL: tt.body,
-					}, errors.ErrAlreadyExists)
+
+				gomock.InOrder(
+					mockRep.EXPECT().
+						FindByShortURL(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+							return nil, false
+						}),
+					mockRep.EXPECT().
+						Save(gomock.Any(), gomock.Any(), tt.body).
+						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+							return &model.ShortenURL{
+								ShortURL:    "gle",
+								OriginalURL: tt.body,
+							}, errors.ErrAlreadyExists
+						}))
 			} else {
 				var generatedShortURL string
-
-				mockRep.EXPECT().
-					FindByOriginalURL(gomock.Any(), tt.body).
-					Return(nil, nil)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
