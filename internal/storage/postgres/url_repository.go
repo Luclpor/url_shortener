@@ -66,7 +66,7 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL s
 
 	var u = new(model.ShortenURL)
 	err := r.pool.QueryRow(ctx, query, shortURL, originalURL).Scan(&u.ShortURL, &u.OriginalURL)
-	if err != nil && errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
 		u, err = r.FindByOriginalURL(ctx, originalURL)
 		if err != nil {
 			return nil, err
@@ -84,16 +84,18 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 	if err != nil {
 		return nil, err
 	}
-	shortenURLs := make([]model.ShortenURL, 0)
-	_, err = tx.Prepare(ctx, "batchSave", "insert into url_shortener (short_url, original_url, correlation_id) values ($1, $2, $3)"+
-		"returning id, short_url, original_url, correlation_id, created_at, updated_at")
-	if err != nil {
-		tx.Rollback(ctx)
-		return nil, err
-	}
+	defer tx.Rollback(ctx)
+
+	shortenURLs := make([]model.ShortenURL, 0, len(dtos))
+	const query = `
+		INSERT INTO url_shortener (short_url, original_url, correlation_id)
+		VALUES ($1, $2, $3)
+		RETURNING id, short_url, original_url, correlation_id, created_at, updated_at
+	`
+
 	for _, v := range dtos {
-		m := model.ShortenURL{}
-		err = tx.QueryRow(ctx, "batchSave", v.ShortURL, v.OriginalURL, v.CorrelationID).
+		var m model.ShortenURL
+		err = tx.QueryRow(ctx, query, v.ShortURL, v.OriginalURL, v.CorrelationID).
 			Scan(
 				&m.ID,
 				&m.ShortURL,
@@ -103,12 +105,16 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 				&m.UpdatedAt,
 			)
 		if err != nil {
-			tx.Rollback(ctx)
 			return nil, err
 		}
 		shortenURLs = append(shortenURLs, m)
 	}
-	return shortenURLs, tx.Commit(ctx)
+
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return shortenURLs, nil
 }
 
 var _ service.URLRepository = (*URLRepository)(nil)
