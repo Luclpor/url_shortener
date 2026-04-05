@@ -14,6 +14,33 @@ import (
 	"github.com/go-chi/render"
 )
 
+func NewCreateBatchShortenHandler(manager *service.URLManager) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithCancel(r.Context())
+		defer cancel()
+		var model []api.CreateShortenReq
+		err := json.NewDecoder(r.Body).Decode(&model)
+		if err != nil {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, err)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		responseModel, err := manager.CreateBatchURL(ctx, model)
+		if err != nil {
+			render.Status(r, http.StatusInternalServerError)
+			render.JSON(w, r, err)
+			return
+		}
+		if len(responseModel) == 0 {
+			render.Status(r, http.StatusOK)
+			return
+		}
+		render.Status(r, http.StatusCreated)
+		render.JSON(w, r, responseModel)
+	}
+}
+
 func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithCancel(r.Context())
@@ -78,7 +105,7 @@ func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		w.Header().Add("Location", s.FullURL)
+		w.Header().Add("Location", s.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	}
 }

@@ -38,7 +38,8 @@ create extension if not exists "uuid-ossp";
 create table if not exists url_shortener
 (
     id          uuid default public.uuid_generate_v4() primary key,
-    full_url    varchar(256) not null,
+    correlation_id varchar(256) null,
+    original_url    varchar(256) not null,
     short_url   varchar(256) not null,
 
     created_at  timestamp with time zone not null,
