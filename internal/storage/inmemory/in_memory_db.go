@@ -1,10 +1,7 @@
 package inmemory
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"os"
 	"sync"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
@@ -13,38 +10,21 @@ import (
 )
 
 type InMemoryDB struct {
-	mu      sync.Mutex
-	urls    []model.ShortenURL
-	file    *os.File
-	encoder *json.Encoder
+	mu          sync.Mutex
+	urls        []model.ShortenURL
+	fileStorage *FileStorage
 }
 
-func NewRepository(filePath string) (*InMemoryDB, error) {
+func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 	urls := make([]model.ShortenURL, 0)
-
-	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	err := fStorage.ScantTo(urls)
 	if err != nil {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		var u model.ShortenURL
-		if err := json.Unmarshal(scanner.Bytes(), &u); err != nil {
-			_ = file.Close()
-			return nil, err
-		}
-		urls = append(urls, u)
-	}
-	if err := scanner.Err(); err != nil {
-		_ = file.Close()
-		return nil, err
-	}
-
 	return &InMemoryDB{
-		urls:    urls,
-		file:    file,
-		encoder: json.NewEncoder(file),
+		urls:        urls,
+		fileStorage: fStorage,
 	}, nil
 }
 
@@ -81,7 +61,7 @@ func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.
 		OriginalURL: fullURL,
 	}
 
-	if err := db.encoder.Encode(u); err != nil {
+	if err := db.fileStorage.SaveInFile(u); err != nil {
 		return nil, err
 	}
 
@@ -99,15 +79,15 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 			OriginalURL:   v.OriginalURL,
 			CorrelationID: &v.CorrelationID,
 		}
-		if err := db.encoder.Encode(m); err != nil {
-			return nil, err
-		}
 		db.urls = append(db.urls, m)
 		models = append(models, m)
+	}
+	if err := db.fileStorage.SaveInFileBatch(models); err != nil {
+		return nil, err
 	}
 	return models, nil
 }
 
 func (db *InMemoryDB) Close() error {
-	return db.file.Close()
+	return db.fileStorage.Close()
 }

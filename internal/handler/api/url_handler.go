@@ -11,11 +11,25 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
+	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
 )
 
-func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
+type Handler struct {
+	cfg     *config.Config
+	manager *service.URLManager
+	health  *service.HealthService
+}
+
+func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager) *Handler {
+	return &Handler{
+		cfg:     cfg,
+		health:  health,
+		manager: manager,
+	}
+}
+
+func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
@@ -27,7 +41,7 @@ func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManage
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, err := manager.CreateBatchURL(ctx, model)
+		responseModel, err := h.manager.CreateBatchURL(ctx, model)
 		if err != nil {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
@@ -39,13 +53,13 @@ func NewCreateBatchShortenHandler(cfg *config.Config, manager *service.URLManage
 		}
 		render.Status(r, http.StatusCreated)
 		for i := range responseModel {
-			responseModel[i].ShortURL = cfg.BaseAddressShort + "/" + responseModel[i].ShortURL
+			responseModel[i].ShortURL = h.cfg.BaseAddressShort + "/" + responseModel[i].ShortURL
 		}
 		render.JSON(w, r, responseModel)
 	}
 }
 
-func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
+func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
@@ -57,14 +71,14 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, err := manager.CreateShortURL(ctx, model.URL)
-		if err != nil && !errors.Is(err, errors2.ErrAlreadyExists) {
+		responseModel, err := h.manager.CreateShortURL(ctx, model.URL)
+		if err != nil && !errors.Is(err, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
 			return
 		}
-		responseModel.Result = cfg.BaseAddressShort + "/" + responseModel.Result
-		if err != nil && errors.Is(err, errors2.ErrAlreadyExists) {
+		responseModel.Result = h.cfg.BaseAddressShort + "/" + responseModel.Result
+		if err != nil && errors.Is(err, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusConflict)
 		} else {
 			render.Status(r, http.StatusCreated)
@@ -73,7 +87,7 @@ func NewCreateShortenUlrJSONHandler(cfg *config.Config, manager *service.URLMana
 	}
 }
 
-func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.HandlerFunc {
+func (h *Handler) NewCreateHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
@@ -83,28 +97,28 @@ func NewCreateHandler(cfg *config.Config, manager *service.URLManager) http.Hand
 			render.PlainText(w, r, http.StatusText(http.StatusBadRequest))
 			return
 		}
-		su, createErr := manager.CreateShortURL(ctx, string(body))
-		if createErr != nil && !errors.Is(createErr, errors2.ErrAlreadyExists) {
+		su, createErr := h.manager.CreateShortURL(ctx, string(body))
+		if createErr != nil && !errors.Is(createErr, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusInternalServerError)
 			render.PlainText(w, r, http.StatusText(http.StatusInternalServerError))
 			return
 		}
 
-		if errors.Is(createErr, errors2.ErrAlreadyExists) {
+		if errors.Is(createErr, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusConflict)
 		} else {
 			render.Status(r, http.StatusCreated)
 		}
 
-		render.PlainText(w, r, cfg.BaseAddressShort+"/"+su.Result)
+		render.PlainText(w, r, h.cfg.BaseAddressShort+"/"+su.Result)
 	}
 }
 
-func NewGetterHandler(manager *service.URLManager) http.HandlerFunc {
+func (h *Handler) NewGetterHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
-		s, err := manager.GetURL(ctx, r.PathValue("id"))
+		s, err := h.manager.GetURL(ctx, r.PathValue("id"))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return

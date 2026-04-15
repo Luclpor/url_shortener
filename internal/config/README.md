@@ -1,4 +1,4 @@
-# internal/config
+# internal/pgxConfgi
 
 В этом пакете хранятся конфигурации приложения.
 

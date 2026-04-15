@@ -33,14 +33,14 @@ func NewServer() *Server {
 	var repo service.URLRepository
 	var healthChecker service.HealthChecker
 	var closers []func() error
-	if cfg.DataBaseDSN != "" {
-		pool, err := postgres.NewPool(context.Background(), cfg.DataBaseDSN)
+	if cfg.Postgres.DataBaseDSN != "" {
+		pool, err := postgres.NewPool(context.Background(), cfg.Postgres)
 		if err != nil {
 			log.Fatal(err)
 		}
 		repo = postgres.NewURLRepository(pool)
 		healthChecker = postgres.NewHealthRepository(pool)
-		err = db.RunMigrations(cfg.DataBaseDSN)
+		err = db.RunMigrations(cfg.Postgres.DataBaseDSN)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -49,7 +49,11 @@ func NewServer() *Server {
 			return nil
 		})
 	} else {
-		memRepo, err := inmemory.NewRepository(cfg.FileStoragePath)
+		fileStorage, err := inmemory.NewFileStorage(cfg.FileStoragePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		memRepo, err := inmemory.NewRepository(fileStorage)
 		healthChecker = inmemory.NewHealthRepository()
 		if err != nil {
 			log.Fatal(err)
