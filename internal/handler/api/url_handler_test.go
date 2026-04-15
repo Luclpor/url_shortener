@@ -98,9 +98,9 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 
 				tt.want.response = cfg.BaseAddressShort + "/"
 			}
-
 			manager := service.NewURLManager(mockRep)
-			createHandler := NewCreateShortenUlrJSONHandler(cfg, manager)
+			handler := NewHandler(cfg, nil, manager)
+			createHandler := handler.NewCreateShortenUlrJSONHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -212,7 +212,8 @@ func TestCreatedShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			createHandler := NewCreateHandler(cfg, manager)
+			handler := NewHandler(cfg, nil, manager)
+			createHandler := handler.NewCreateHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -290,7 +291,8 @@ func TestGetShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			getHandler := NewGetterHandler(manager)
+			handler := NewHandler(nil, nil, manager)
+			getHandler := handler.NewGetterHandler()
 
 			mux := http.NewServeMux()
 			mux.HandleFunc("GET /{id}", getHandler)

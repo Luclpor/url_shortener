@@ -29,19 +29,19 @@ func NewURLManager(repo URLRepository) *URLManager {
 }
 
 func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*api.ShortenResp, error) {
-	var resultApiModel *api.ShortenResp
+	var resultAPIModel *api.ShortenResp
 	key, b := m.getUniqueKey(ctx, originalURL, 0)
 	if !b {
 		return nil, fmt.Errorf("short url already exists")
 	}
 	url, err := m.repo.Save(ctx, key, originalURL)
 	if url != nil {
-		resultApiModel = &api.ShortenResp{Result: url.ShortURL}
+		resultAPIModel = &api.ShortenResp{Result: url.ShortURL}
 	}
 	if err != nil {
-		return resultApiModel, fmt.Errorf("failed to save url: %s, err: %w", originalURL, err)
+		return resultAPIModel, fmt.Errorf("failed to save url: %s, err: %w", originalURL, err)
 	}
-	return resultApiModel, nil
+	return resultAPIModel, nil
 
 }
 
