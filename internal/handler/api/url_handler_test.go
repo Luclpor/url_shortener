@@ -12,7 +12,8 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	modelapi "github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	serviceMock "github.com/Luclpor/url_shortener.git/internal/service/mock"
+	storageMock "github.com/Luclpor/url_shortener.git/internal/storage/mock"
+	"github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -34,7 +35,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			name: "already exist",
 			body: `{"url":"https://www.google.com"}`,
 			want: want{
-				code:        http.StatusOK,
+				code:        http.StatusConflict,
 				contentType: "application/json",
 				response:    "http://localhost:8080/gle",
 			},
@@ -56,46 +57,50 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			mockRep := serviceMock.NewMockURLRepository(ctrl)
+			mockRep := storageMock.NewMockURLRepository(ctrl)
 
 			var requestBody modelapi.CreateShortenReq
 			err := json.Unmarshal([]byte(tt.body), &requestBody)
 			require.NoError(t, err)
 
 			if tt.name == "already exist" {
-				mockRep.EXPECT().
-					FindByLongURL(gomock.Any(), requestBody.URL).
-					Return(&model.URL{
-						ShortURL: "gle",
-						FullURL:  requestBody.URL,
-					}, true)
+				gomock.InOrder(
+					mockRep.EXPECT().
+						FindByShortURL(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+							return nil, false
+						}),
+					mockRep.EXPECT().
+						Save(gomock.Any(), gomock.Any(), "https://www.google.com").
+						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+							return &model.ShortenURL{
+								ShortURL:    "gle",
+								OriginalURL: "https://www.google.com",
+							}, errors.ErrAlreadyExists
+						}))
 			} else {
 				var generatedShortURL string
-
-				mockRep.EXPECT().
-					FindByLongURL(gomock.Any(), requestBody.URL).
-					Return(nil, false)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ any, shortURL string) (*model.URL, bool) {
+					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
 					})
 				mockRep.EXPECT().
 					Save(gomock.Any(), gomock.Any(), requestBody.URL).
-					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.URL, error) {
+					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
-						return &model.URL{
-							ShortURL: shortURL,
-							FullURL:  fullURL,
+						return &model.ShortenURL{
+							ShortURL:    shortURL,
+							OriginalURL: fullURL,
 						}, nil
 					})
 
 				tt.want.response = cfg.BaseAddressShort + "/"
 			}
-
 			manager := service.NewURLManager(mockRep)
-			createHandler := NewCreateShortenUlrJSONHandler(cfg, manager)
+			handler := NewHandler(cfg, nil, manager)
+			createHandler := handler.NewCreateShortenUlrJSONHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -145,7 +150,7 @@ func TestCreatedShortURL(t *testing.T) {
 			name: "already exist",
 			body: "https://www.google.com",
 			want: want{
-				code:        http.StatusOK,
+				code:        http.StatusConflict,
 				contentType: "text/plain",
 				response:    "http://localhost:8080/gle",
 			},
@@ -167,34 +172,39 @@ func TestCreatedShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			mockRep := serviceMock.NewMockURLRepository(ctrl)
+			mockRep := storageMock.NewMockURLRepository(ctrl)
 
 			if tt.name == "already exist" {
-				mockRep.EXPECT().
-					FindByLongURL(gomock.Any(), tt.body).
-					Return(&model.URL{
-						ShortURL: "gle",
-						FullURL:  tt.body,
-					}, true)
+
+				gomock.InOrder(
+					mockRep.EXPECT().
+						FindByShortURL(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+							return nil, false
+						}),
+					mockRep.EXPECT().
+						Save(gomock.Any(), gomock.Any(), tt.body).
+						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+							return &model.ShortenURL{
+								ShortURL:    "gle",
+								OriginalURL: tt.body,
+							}, errors.ErrAlreadyExists
+						}))
 			} else {
 				var generatedShortURL string
-
-				mockRep.EXPECT().
-					FindByLongURL(gomock.Any(), tt.body).
-					Return(nil, false)
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ any, shortURL string) (*model.URL, bool) {
+					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
 					})
 				mockRep.EXPECT().
 					Save(gomock.Any(), gomock.Any(), tt.body).
-					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.URL, error) {
+					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
-						return &model.URL{
-							ShortURL: shortURL,
-							FullURL:  fullURL,
+						return &model.ShortenURL{
+							ShortURL:    shortURL,
+							OriginalURL: fullURL,
 						}, nil
 					})
 
@@ -202,7 +212,8 @@ func TestCreatedShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			createHandler := NewCreateHandler(cfg, manager)
+			handler := NewHandler(cfg, nil, manager)
+			createHandler := handler.NewCreateHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
@@ -264,14 +275,14 @@ func TestGetShortURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			mockRep := serviceMock.NewMockURLRepository(ctrl)
+			mockRep := storageMock.NewMockURLRepository(ctrl)
 
 			if tt.want.location != "" {
 				mockRep.EXPECT().
 					FindByShortURL(gomock.Any(), tt.shortURL).
-					Return(&model.URL{
-						ShortURL: tt.shortURL,
-						FullURL:  tt.want.location,
+					Return(&model.ShortenURL{
+						ShortURL:    tt.shortURL,
+						OriginalURL: tt.want.location,
 					}, true)
 			} else {
 				mockRep.EXPECT().
@@ -280,7 +291,8 @@ func TestGetShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			getHandler := NewGetterHandler(manager)
+			handler := NewHandler(nil, nil, manager)
+			getHandler := handler.NewGetterHandler()
 
 			mux := http.NewServeMux()
 			mux.HandleFunc("GET /{id}", getHandler)

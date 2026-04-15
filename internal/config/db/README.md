@@ -1,4 +1,4 @@
-# internal/config/db
+# internal/pgxConfgi/db
 
 Описание конфигурации подключения к базе данных.
 

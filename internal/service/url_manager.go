@@ -2,19 +2,22 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
-	"github.com/Luclpor/url_shortener.git/pkg/errors"
+	"github.com/Luclpor/url_shortener.git/internal/model/dto"
+	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
 )
 
-//go:generate mockgen -source=url_manager.go -destination=mock/mock_user_repository.go -package=mock
+//go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
 
 type URLRepository interface {
-	FindByShortURL(ctx context.Context, shortURL string) (*model.URL, bool)
-	FindByLongURL(ctx context.Context, longURL string) (*model.URL, bool)
-	Save(ctx context.Context, shortURL string, fullURL string) (*model.URL, error)
+	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
+	FindByOriginalURL(ctx context.Context, longURL string) (*model.ShortenURL, error)
+	Save(ctx context.Context, shortURL string, fullURL string) (*model.ShortenURL, error)
+	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
 }
 
 type URLManager struct {
@@ -25,23 +28,62 @@ func NewURLManager(repo URLRepository) *URLManager {
 	return &URLManager{repo: repo}
 }
 
-func (m *URLManager) CreateShortURL(ctx context.Context, longURL string) (*api.ShortenResp, error) {
-	if url, b := m.repo.FindByLongURL(ctx, longURL); b {
-		return &api.ShortenResp{Result: url.ShortURL}, errors.ErrAlreadyExists
-	}
-	key, b := m.getUniqueKey(ctx, longURL, 0)
+func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*api.ShortenResp, error) {
+	var resultAPIModel *api.ShortenResp
+	key, b := m.getUniqueKey(ctx, originalURL, 0)
 	if !b {
 		return nil, fmt.Errorf("short url already exists")
 	}
-	url, err := m.repo.Save(ctx, key, longURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to save url: %s", longURL)
+	url, err := m.repo.Save(ctx, key, originalURL)
+	if url != nil {
+		resultAPIModel = &api.ShortenResp{Result: url.ShortURL}
 	}
-	return &api.ShortenResp{Result: url.ShortURL}, nil
+	if err != nil {
+		return resultAPIModel, fmt.Errorf("failed to save url: %s, err: %w", originalURL, err)
+	}
+	return resultAPIModel, nil
 
 }
 
-func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.URL, error) {
+func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq) ([]api.ShortenBatchResp, error) {
+	toAdd := make([]dto.URLDto, 0)
+	existsModels := make([]model.ShortenURL, 0)
+	for _, v := range apiModels {
+		existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL)
+		if err != nil && !errors.Is(err, errors2.ErrNotFound) {
+			return nil, err
+		}
+		if existModel != nil {
+			existsModels = append(existsModels, *existModel)
+			continue
+		}
+		var sURL string
+		var success bool
+		if sURL, success = m.getUniqueKey(ctx, v.OriginalURL, 0); !success {
+			return nil, fmt.Errorf("short url already exists")
+		}
+		toAdd = append(toAdd, dto.URLDto{
+			OriginalURL:   v.OriginalURL,
+			ShortURL:      sURL,
+			CorrelationID: v.CorrelationID,
+		})
+	}
+	entities, err := m.repo.SaveBatch(ctx, toAdd)
+	if err != nil {
+		return nil, err
+	}
+	entities = append(entities, existsModels...)
+	batchResps := make([]api.ShortenBatchResp, len(entities))
+	for i, v := range entities {
+		batchResps[i] = api.ShortenBatchResp{
+			ShortURL:      v.ShortURL,
+			CorrelationID: *v.CorrelationID,
+		}
+	}
+	return batchResps, nil
+}
+
+func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.ShortenURL, error) {
 	url, b := m.repo.FindByShortURL(ctx, shortURL)
 	if !b {
 		return nil, fmt.Errorf("short url not found")
