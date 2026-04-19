@@ -68,8 +68,8 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			if tt.name == "already exist" {
 				gomock.InOrder(
 					mockRep.EXPECT().
-						FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
-						DoAndReturn(func(_ any, shortURL string, _ any) (*model.ShortenURL, bool) {
+						FindByShortURL(gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 							return nil, false
 						}),
 					mockRep.EXPECT().
@@ -83,8 +83,8 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			} else {
 				var generatedShortURL string
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ any, shortURL string, _ any) (*model.ShortenURL, bool) {
+					FindByShortURL(gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
 					})
@@ -181,7 +181,7 @@ func TestCreatedShortURL(t *testing.T) {
 
 				gomock.InOrder(
 					mockRep.EXPECT().
-						FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
+						FindByShortURL(gomock.Any(), gomock.Any()).
 						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 							return nil, false
 						}),
@@ -196,7 +196,7 @@ func TestCreatedShortURL(t *testing.T) {
 			} else {
 				var generatedShortURL string
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
+					FindByShortURL(gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
@@ -282,14 +282,14 @@ func TestGetShortURL(t *testing.T) {
 
 			if tt.want.location != "" {
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), tt.shortURL, gomock.Any()).
+					FindByShortURL(gomock.Any(), tt.shortURL).
 					Return(&model.ShortenURL{
 						ShortURL:    tt.shortURL,
 						OriginalURL: tt.want.location,
 					}, true)
 			} else {
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), tt.shortURL, gomock.Any()).
+					FindByShortURL(gomock.Any(), tt.shortURL).
 					Return(nil, false)
 			}
 

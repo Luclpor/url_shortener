@@ -68,7 +68,7 @@ func TestURLManager_GetURL(t *testing.T) {
 				b = true
 			}
 
-			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL, gomock.Any()).
+			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
 				Return(res, b)
 
 			manager := &URLManager{
@@ -147,8 +147,8 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				repo: tt.fields.repo,
 			}
 			mockRep.EXPECT().
-				FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, shortURL string, _ any) (*model.ShortenURL, bool) {
+				FindByShortURL(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
 					if shortURL == tt.want.Result {
 						return &model.ShortenURL{
 							ShortURL:    tt.want.Result,

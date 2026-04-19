@@ -74,18 +74,18 @@ func (mr *MockURLRepositoryMockRecorder) FindByOriginalURL(ctx, longURL, userId 
 }
 
 // FindByShortURL mocks base method.
-func (m *MockURLRepository) FindByShortURL(ctx context.Context, shortURL string, userId uuid.UUID) (*model.ShortenURL, bool) {
+func (m *MockURLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByShortURL", ctx, shortURL, userId)
+	ret := m.ctrl.Call(m, "FindByShortURL", ctx, shortURL)
 	ret0, _ := ret[0].(*model.ShortenURL)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // FindByShortURL indicates an expected call of FindByShortURL.
-func (mr *MockURLRepositoryMockRecorder) FindByShortURL(ctx, shortURL, userId any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) FindByShortURL(ctx, shortURL any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByShortURL", reflect.TypeOf((*MockURLRepository)(nil).FindByShortURL), ctx, shortURL, userId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByShortURL", reflect.TypeOf((*MockURLRepository)(nil).FindByShortURL), ctx, shortURL)
 }
 
 // Save mocks base method.
