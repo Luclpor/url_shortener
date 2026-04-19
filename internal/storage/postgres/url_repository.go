@@ -50,15 +50,15 @@ func (r *URLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uu
 	return urls, nil
 }
 
-func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string, userId uuid.UUID) (*model.ShortenURL, bool) {
+func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
 	const query = `
 		SELECT short_url, original_url, user_id
 		FROM url_shortener
-		WHERE short_url = $1 AND user_id = $2
+		WHERE short_url = $1
 	`
 
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, shortURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false

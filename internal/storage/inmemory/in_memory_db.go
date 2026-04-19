@@ -44,12 +44,12 @@ func (db *InMemoryDB) FindBatchShortURLByUserID(_ context.Context, userID uuid.U
 	return urls, nil
 }
 
-func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string, userID uuid.UUID) (*model.ShortenURL, bool) {
+func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	for i := range db.urls {
-		if db.urls[i].ShortURL == shortURL && db.urls[i].UserID == userID {
+		if db.urls[i].ShortURL == shortURL {
 			return &db.urls[i], true
 		}
 	}

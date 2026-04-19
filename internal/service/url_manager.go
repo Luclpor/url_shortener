@@ -17,7 +17,7 @@ import (
 
 type URLRepository interface {
 	FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
-	FindByShortURL(ctx context.Context, shortURL string, userId uuid.UUID) (*model.ShortenURL, bool)
+	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
 	FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error)
 	Save(ctx context.Context, shortURL string, fullURL string, userId uuid.UUID) (*model.ShortenURL, error)
 	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
@@ -96,11 +96,7 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 }
 
 func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.ShortenURL, error) {
-	user, err := auth.UserFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	url, b := m.repo.FindByShortURL(ctx, shortURL, user.ID)
+	url, b := m.repo.FindByShortURL(ctx, shortURL)
 	if !b {
 		return nil, appErrors.ErrNotFound
 	}
@@ -124,7 +120,7 @@ func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int
 		return "", false
 	}
 	key := GenerateRandomString(5)
-	_, ok := m.repo.FindByShortURL(ctx, key, userId)
+	_, ok := m.repo.FindByShortURL(ctx, key)
 	if ok {
 		m.getUniqueKey(ctx, longURL, count, userId)
 	}
