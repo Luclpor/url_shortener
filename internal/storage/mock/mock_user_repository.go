@@ -15,6 +15,7 @@ import (
 
 	model "github.com/Luclpor/url_shortener.git/internal/model"
 	dto "github.com/Luclpor/url_shortener.git/internal/model/dto"
+	uuid "github.com/google/uuid"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,49 +43,64 @@ func (m *MockURLRepository) EXPECT() *MockURLRepositoryMockRecorder {
 	return m.recorder
 }
 
-// FindByOriginalURL mocks base method.
-func (m *MockURLRepository) FindByOriginalURL(ctx context.Context, longURL string) (*model.ShortenURL, error) {
+// FindBatchShortURLByUserID mocks base method.
+func (m *MockURLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByOriginalURL", ctx, longURL)
+	ret := m.ctrl.Call(m, "FindBatchShortURLByUserID", ctx, userID)
+	ret0, _ := ret[0].([]model.ShortenURL)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindBatchShortURLByUserID indicates an expected call of FindBatchShortURLByUserID.
+func (mr *MockURLRepositoryMockRecorder) FindBatchShortURLByUserID(ctx, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindBatchShortURLByUserID", reflect.TypeOf((*MockURLRepository)(nil).FindBatchShortURLByUserID), ctx, userID)
+}
+
+// FindByOriginalURL mocks base method.
+func (m *MockURLRepository) FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindByOriginalURL", ctx, longURL, userId)
 	ret0, _ := ret[0].(*model.ShortenURL)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // FindByOriginalURL indicates an expected call of FindByOriginalURL.
-func (mr *MockURLRepositoryMockRecorder) FindByOriginalURL(ctx, longURL any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) FindByOriginalURL(ctx, longURL, userId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByOriginalURL", reflect.TypeOf((*MockURLRepository)(nil).FindByOriginalURL), ctx, longURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByOriginalURL", reflect.TypeOf((*MockURLRepository)(nil).FindByOriginalURL), ctx, longURL, userId)
 }
 
 // FindByShortURL mocks base method.
-func (m *MockURLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
+func (m *MockURLRepository) FindByShortURL(ctx context.Context, shortURL string, userId uuid.UUID) (*model.ShortenURL, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindByShortURL", ctx, shortURL)
+	ret := m.ctrl.Call(m, "FindByShortURL", ctx, shortURL, userId)
 	ret0, _ := ret[0].(*model.ShortenURL)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // FindByShortURL indicates an expected call of FindByShortURL.
-func (mr *MockURLRepositoryMockRecorder) FindByShortURL(ctx, shortURL any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) FindByShortURL(ctx, shortURL, userId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByShortURL", reflect.TypeOf((*MockURLRepository)(nil).FindByShortURL), ctx, shortURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindByShortURL", reflect.TypeOf((*MockURLRepository)(nil).FindByShortURL), ctx, shortURL, userId)
 }
 
 // Save mocks base method.
-func (m *MockURLRepository) Save(ctx context.Context, shortURL, fullURL string) (*model.ShortenURL, error) {
+func (m *MockURLRepository) Save(ctx context.Context, shortURL, fullURL string, userId uuid.UUID) (*model.ShortenURL, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Save", ctx, shortURL, fullURL)
+	ret := m.ctrl.Call(m, "Save", ctx, shortURL, fullURL, userId)
 	ret0, _ := ret[0].(*model.ShortenURL)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Save indicates an expected call of Save.
-func (mr *MockURLRepositoryMockRecorder) Save(ctx, shortURL, fullURL any) *gomock.Call {
+func (mr *MockURLRepositoryMockRecorder) Save(ctx, shortURL, fullURL, userId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockURLRepository)(nil).Save), ctx, shortURL, fullURL)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockURLRepository)(nil).Save), ctx, shortURL, fullURL, userId)
 }
 
 // SaveBatch mocks base method.

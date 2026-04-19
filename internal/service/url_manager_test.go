@@ -8,8 +8,10 @@ import (
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/Luclpor/url_shortener.git/internal/storage/mock"
 	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -45,6 +47,8 @@ func TestURLManager_GetURL(t *testing.T) {
 		},
 	}
 
+	ctx := auth.WithUser(context.Background(), &model.User{ID: uuid.New()})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -64,13 +68,13 @@ func TestURLManager_GetURL(t *testing.T) {
 				b = true
 			}
 
-			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
+			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL, gomock.Any()).
 				Return(res, b)
 
 			manager := &URLManager{
 				repo: mockRep,
 			}
-			got, err := manager.GetURL(context.Background(), tt.args.shortURL)
+			got, err := manager.GetURL(ctx, tt.args.shortURL)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -143,8 +147,8 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				repo: tt.fields.repo,
 			}
 			mockRep.EXPECT().
-				FindByShortURL(gomock.Any(), gomock.Any()).
-				DoAndReturn(func(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
+				FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, shortURL string, _ any) (*model.ShortenURL, bool) {
 					if shortURL == tt.want.Result {
 						return &model.ShortenURL{
 							ShortURL:    tt.want.Result,
@@ -157,15 +161,15 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 
 			if tt.alreadyExist {
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), tt.args.longURL).
+					Save(gomock.Any(), gomock.Any(), tt.args.longURL, gomock.Any()).
 					Return(&model.ShortenURL{
 						ShortURL:    tt.want.Result,
 						OriginalURL: tt.args.longURL,
 					}, errors2.ErrAlreadyExists)
 			} else {
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ context.Context, shortURL string, longURL string) (*model.ShortenURL, error) {
+					Save(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ context.Context, shortURL string, longURL string, _ any) (*model.ShortenURL, error) {
 						if longURL == tt.args.longURL {
 							return &model.ShortenURL{
 								ShortURL:    tt.want.Result,

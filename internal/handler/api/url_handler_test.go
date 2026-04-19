@@ -12,8 +12,10 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	modelapi "github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	storageMock "github.com/Luclpor/url_shortener.git/internal/storage/mock"
 	"github.com/Luclpor/url_shortener.git/pkg/errors"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -66,13 +68,13 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			if tt.name == "already exist" {
 				gomock.InOrder(
 					mockRep.EXPECT().
-						FindByShortURL(gomock.Any(), gomock.Any()).
-						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+						FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string, _ any) (*model.ShortenURL, bool) {
 							return nil, false
 						}),
 					mockRep.EXPECT().
-						Save(gomock.Any(), gomock.Any(), "https://www.google.com").
-						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+						Save(gomock.Any(), gomock.Any(), "https://www.google.com", gomock.Any()).
+						DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 							return &model.ShortenURL{
 								ShortURL:    "gle",
 								OriginalURL: "https://www.google.com",
@@ -81,14 +83,14 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			} else {
 				var generatedShortURL string
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), gomock.Any()).
-					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
+					FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(_ any, shortURL string, _ any) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
 					})
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), requestBody.URL).
-					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+					Save(gomock.Any(), gomock.Any(), requestBody.URL, gomock.Any()).
+					DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.ShortenURL{
 							ShortURL:    shortURL,
@@ -103,8 +105,9 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			createHandler := handler.NewCreateShortenUlrJSONHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
-			rec := httptest.NewRecorder()
+			req = req.WithContext(auth.WithUser(req.Context(), &model.User{ID: uuid.New()}))
 
+			rec := httptest.NewRecorder()
 			createHandler(rec, req)
 
 			res := rec.Result()
@@ -178,12 +181,12 @@ func TestCreatedShortURL(t *testing.T) {
 
 				gomock.InOrder(
 					mockRep.EXPECT().
-						FindByShortURL(gomock.Any(), gomock.Any()).
+						FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
 						DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 							return nil, false
 						}),
 					mockRep.EXPECT().
-						Save(gomock.Any(), gomock.Any(), tt.body).
+						Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
 						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
 							return &model.ShortenURL{
 								ShortURL:    "gle",
@@ -193,13 +196,13 @@ func TestCreatedShortURL(t *testing.T) {
 			} else {
 				var generatedShortURL string
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), gomock.Any()).
+					FindByShortURL(gomock.Any(), gomock.Any(), gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string) (*model.ShortenURL, bool) {
 						generatedShortURL = shortURL
 						return nil, false
 					})
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), tt.body).
+					Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
 					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.ShortenURL{
@@ -279,14 +282,14 @@ func TestGetShortURL(t *testing.T) {
 
 			if tt.want.location != "" {
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), tt.shortURL).
+					FindByShortURL(gomock.Any(), tt.shortURL, gomock.Any()).
 					Return(&model.ShortenURL{
 						ShortURL:    tt.shortURL,
 						OriginalURL: tt.want.location,
 					}, true)
 			} else {
 				mockRep.EXPECT().
-					FindByShortURL(gomock.Any(), tt.shortURL).
+					FindByShortURL(gomock.Any(), tt.shortURL, gomock.Any()).
 					Return(nil, false)
 			}
 

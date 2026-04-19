@@ -14,6 +14,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/config/db"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 )
@@ -29,17 +30,22 @@ type Server struct {
 
 func NewServer() *Server {
 	cfg := config.InitConfig()
-
 	var repo service.URLRepository
 	var healthChecker service.HealthChecker
+	var userAuth auth.UserAuthentication
 	var closers []func() error
 	if cfg.Postgres.DataBaseDSN != "" {
 		pool, err := postgres.NewPool(context.Background(), cfg.Postgres)
 		if err != nil {
 			log.Fatal(err)
 		}
-		repo = postgres.NewURLRepository(pool)
+		urlRepo := postgres.NewURLRepository(pool)
+		repo = urlRepo
 		healthChecker = postgres.NewHealthRepository(pool)
+		userAuth, err = auth.InitAuthService([]byte("12345678901234567890123456789012"), urlRepo)
+		if err != nil {
+			log.Fatal(err)
+		}
 		err = db.RunMigrations(cfg.Postgres.DataBaseDSN)
 		if err != nil {
 			log.Fatal(err)
@@ -58,12 +64,16 @@ func NewServer() *Server {
 		if err != nil {
 			log.Fatal(err)
 		}
+		userAuth, err = auth.InitAuthService([]byte("12345678901234567890123456789012"), memRepo)
+		if err != nil {
+			log.Fatal(err)
+		}
 		repo = memRepo
 		closers = append(closers, memRepo.Close)
 	}
 	healthService := service.NewHealthService(healthChecker)
 	manager := service.NewURLManager(repo)
-	router, err := router2.NewRouter(cfg, manager, healthService)
+	router, err := router2.NewRouter(cfg, manager, healthService, userAuth)
 	if err != nil {
 		log.Fatal(err)
 	}

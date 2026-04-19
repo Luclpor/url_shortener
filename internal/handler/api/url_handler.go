@@ -61,7 +61,7 @@ func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 
 func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*666)
 		defer cancel()
 		var model api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
@@ -125,5 +125,23 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 		}
 		w.Header().Add("Location", s.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+	}
+}
+
+func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*1330)
+		defer cancel()
+		urls, err := h.manager.GetBatchURLByUserID(ctx)
+		if err != nil {
+			if errors.Is(err, appErrors.ErrNotFound) {
+				render.Status(r, http.StatusNoContent)
+				render.JSON(w, r, err)
+				return
+			}
+			render.Status(r, http.StatusInternalServerError)
+			return
+		}
+		render.JSON(w, r, urls)
 	}
 }

@@ -7,7 +7,8 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
+	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -20,15 +21,44 @@ func NewURLRepository(pool *pgxpool.Pool) *URLRepository {
 	return &URLRepository{pool: pool}
 }
 
-func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
+func (r *URLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
-		SELECT short_url, original_url
+		SELECT short_url, original_url, user_id
 		FROM url_shortener
-		WHERE short_url = $1
+		WHERE user_id = $1
+	`
+
+	urls := []model.ShortenURL{}
+	rows, err := r.pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		url := model.ShortenURL{}
+		err = rows.Scan(&url.ShortURL, &url.OriginalURL, &url.UserID)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, url)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(urls) == 0 {
+		return nil, appErrors.ErrNotFound
+	}
+	return urls, nil
+}
+
+func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string, userId uuid.UUID) (*model.ShortenURL, bool) {
+	const query = `
+		SELECT short_url, original_url, user_id
+		FROM url_shortener
+		WHERE short_url = $1 AND user_id = $2
 	`
 
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.OriginalURL)
+	err := r.pool.QueryRow(ctx, query, shortURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -39,16 +69,16 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 	return &u, true
 }
 
-func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string) (*model.ShortenURL, error) {
+func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, correlation_id
 		FROM url_shortener
-		WHERE original_url = $1
+		WHERE original_url = $1 AND user_id = $2
 	`
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, longURL).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID)
+	err := r.pool.QueryRow(ctx, query, longURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID, &u.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, errors2.ErrNotFound
+		return nil, appErrors.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -56,22 +86,22 @@ func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string) (
 	return &u, nil
 }
 
-func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL string) (*model.ShortenURL, error) {
+func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL string, userId uuid.UUID) (*model.ShortenURL, error) {
 	const query = `
-		INSERT INTO url_shortener (short_url, original_url)
-		VALUES ($1, $2)
+		INSERT INTO url_shortener (short_url, original_url, user_id)
+		VALUES ($1, $2, $3)
 		on conflict(original_url) do nothing
-		RETURNING short_url, original_url
+		RETURNING short_url, original_url, user_id
 	`
 
 	var u = new(model.ShortenURL)
-	err := r.pool.QueryRow(ctx, query, shortURL, originalURL).Scan(&u.ShortURL, &u.OriginalURL)
+	err := r.pool.QueryRow(ctx, query, shortURL, originalURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		u, err = r.FindByOriginalURL(ctx, originalURL)
+		u, err = r.FindByOriginalURL(ctx, originalURL, userId)
 		if err != nil {
 			return nil, err
 		}
-		return u, errors2.ErrAlreadyExists
+		return u, appErrors.ErrAlreadyExists
 	}
 	if err != nil {
 		return nil, err
@@ -88,19 +118,20 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 
 	shortenURLs := make([]model.ShortenURL, 0, len(dtos))
 	const query = `
-		INSERT INTO url_shortener (short_url, original_url, correlation_id)
+		INSERT INTO url_shortener (short_url, original_url, correlation_id, user_id)
 		VALUES ($1, $2, $3)
-		RETURNING id, short_url, original_url, correlation_id, created_at, updated_at
+		RETURNING id, short_url, original_url, correlation_id, user_id, created_at, updated_at
 	`
 
 	for _, v := range dtos {
 		var m model.ShortenURL
-		err = tx.QueryRow(ctx, query, v.ShortURL, v.OriginalURL, v.CorrelationID).
+		err = tx.QueryRow(ctx, query, v.ShortURL, v.OriginalURL, v.CorrelationID, v.UserID).
 			Scan(
 				&m.ID,
 				&m.ShortURL,
 				&m.OriginalURL,
 				&m.CorrelationID,
+				&m.UserID,
 				&m.CreatedAt,
 				&m.UpdatedAt,
 			)
