@@ -120,6 +120,10 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 		defer cancel()
 		s, err := h.manager.GetURL(ctx, r.PathValue("id"))
 		if err != nil {
+			if errors.Is(err, appErrors.ErrNotFound) {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

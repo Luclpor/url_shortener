@@ -9,7 +9,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
 	"github.com/Luclpor/url_shortener.git/internal/service/auth"
-	errors2 "github.com/Luclpor/url_shortener.git/pkg/errors"
+	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/google/uuid"
 )
 
@@ -61,7 +61,7 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 	existsModels := make([]model.ShortenURL, 0)
 	for _, v := range apiModels {
 		existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL, user.ID)
-		if err != nil && !errors.Is(err, errors2.ErrNotFound) {
+		if err != nil && !errors.Is(err, appErrors.ErrNotFound) {
 			return nil, err
 		}
 		if existModel != nil {
@@ -102,7 +102,7 @@ func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.Shorte
 	}
 	url, b := m.repo.FindByShortURL(ctx, shortURL, user.ID)
 	if !b {
-		return nil, fmt.Errorf("short url not found")
+		return nil, appErrors.ErrNotFound
 	}
 	return url, nil
 }
