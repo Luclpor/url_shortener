@@ -16,4 +16,3 @@ create trigger tiub_service_user_audit
                          execute procedure audit_table();
 
 alter table url_shortener add column user_id uuid not null;
-alter table url_shortener add  CONSTRAINT user_id_fkey FOREIGN KEY (user_id) REFERENCES service_user(id) ON DELETE cascade;
