@@ -18,12 +18,16 @@ func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *s
 	r.Use(logger.RequestLogger)
 	r.Use(middleware.Recoverer)
 	r.Use(customMidlleware.CompressMiddleware)
-	r.Use(customMidlleware.Auth(userAuth))
-	r.Post("/api/shorten", handler.NewCreateShortenUlrJSONHandler())
-	r.Get("/api/user/url", handler.NewGetBatchHandler())
-	r.Post("/", handler.NewCreateHandler())
-	r.Post("/api/shorten/batch", handler.NewCreateBatchShortenHandler())
-	r.Get("/{id}", handler.NewGetterHandler())
 	r.Get("/ping", handler.NewPingHandler())
+
+	r.Route("/", func(r chi.Router) {
+		r.Use(customMidlleware.Auth(userAuth))
+		r.Post("/api/shorten", handler.NewCreateShortenUlrJSONHandler())
+		r.Get("/api/user/url", handler.NewGetBatchHandler())
+		r.Post("/", handler.NewCreateHandler())
+		r.Post("/api/shorten/batch", handler.NewCreateBatchShortenHandler())
+		r.Get("/{id}", handler.NewGetterHandler())
+	})
+
 	return r, nil
 }
