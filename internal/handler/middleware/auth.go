@@ -13,6 +13,12 @@ func Auth(userAuth auth.UserAuthentication) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var user *model.User
 
+			for _, cookie := range r.Cookies() {
+				logger.SugarLogger.Infow("cookie",
+					"name", cookie.Name,
+					"value", cookie.Value,
+				)
+			}
 			cookie, err := r.Cookie("user_id")
 			if err != nil {
 				logger.SugarLogger.Info("cookie not found")
