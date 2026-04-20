@@ -187,7 +187,7 @@ func TestCreatedShortURL(t *testing.T) {
 						}),
 					mockRep.EXPECT().
 						Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
-						DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+						DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 							return &model.ShortenURL{
 								ShortURL:    "gle",
 								OriginalURL: tt.body,
@@ -203,7 +203,7 @@ func TestCreatedShortURL(t *testing.T) {
 					})
 				mockRep.EXPECT().
 					Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
-					DoAndReturn(func(_ any, shortURL string, fullURL string) (*model.ShortenURL, error) {
+					DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.ShortenURL{
 							ShortURL:    shortURL,
@@ -219,8 +219,9 @@ func TestCreatedShortURL(t *testing.T) {
 			createHandler := handler.NewCreateHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
-			rec := httptest.NewRecorder()
+			req = req.WithContext(auth.WithUser(req.Context(), &model.User{ID: uuid.New()}))
 
+			rec := httptest.NewRecorder()
 			createHandler(rec, req)
 
 			res := rec.Result()
@@ -270,7 +271,7 @@ func TestGetShortURL(t *testing.T) {
 			name:     "not found",
 			shortURL: "notExist",
 			want: want{
-				code: http.StatusBadRequest,
+				code: http.StatusNoContent,
 			},
 		},
 	}
