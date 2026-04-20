@@ -140,6 +140,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			wantErr: nil,
 		},
 	}
+	ctx := auth.WithUser(context.Background(), &model.User{ID: uuid.New()})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -180,7 +181,7 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 					})
 			}
 
-			got, err := m.CreateShortURL(context.Background(), tt.args.longURL)
+			got, err := m.CreateShortURL(ctx, tt.args.longURL)
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
 			} else {
