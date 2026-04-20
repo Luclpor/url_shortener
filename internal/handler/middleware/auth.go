@@ -13,6 +13,11 @@ func Auth(userAuth auth.UserAuthentication) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var user *model.User
 
+			logger.SugarLogger.Infow("incoming cookies",
+				"cookie_header", r.Header.Get("Cookie"),
+				"cookies_count", len(r.Cookies()),
+			)
+
 			for _, cookie := range r.Cookies() {
 				logger.SugarLogger.Infow("cookie",
 					"name", cookie.Name,
