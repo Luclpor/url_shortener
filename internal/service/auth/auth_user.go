@@ -31,6 +31,8 @@ func generateRandom(size int) ([]byte, error) {
 type UserAuthentication interface {
 	CreateEncryptedUser() (*model.User, string, error)
 	DecryptUser(value string) (*model.User, error)
+	GetUserFromContext(ctx context.Context) (*model.User, error)
+	SetUserOnContext(ctx context.Context, user *model.User) context.Context
 }
 
 type UserAuth struct {

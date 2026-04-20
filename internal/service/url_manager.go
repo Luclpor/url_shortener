@@ -8,7 +8,6 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
-	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/google/uuid"
 )
@@ -31,12 +30,8 @@ func NewURLManager(repo URLRepository) *URLManager {
 	return &URLManager{repo: repo}
 }
 
-func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*api.ShortenResp, error) {
+func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string, user *model.User) (*api.ShortenResp, error) {
 	var resultAPIModel *api.ShortenResp
-	user, err := auth.UserFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
 	key, b := m.getUniqueKey(ctx, originalURL, 0, user.ID)
 	if !b {
 		return nil, fmt.Errorf("short url already exists")
@@ -52,12 +47,8 @@ func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string) (*a
 
 }
 
-func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq) ([]api.ShortenBatchResp, error) {
+func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq, user *model.User) ([]api.ShortenBatchResp, error) {
 	toAdd := make([]dto.URLDto, 0)
-	user, err := auth.UserFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
 	existsModels := make([]model.ShortenURL, 0)
 	for _, v := range apiModels {
 		existModel, err := m.repo.FindByOriginalURL(ctx, v.OriginalURL, user.ID)
@@ -103,11 +94,7 @@ func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.Shorte
 	return url, nil
 }
 
-func (m *URLManager) GetBatchURLByUserID(ctx context.Context) ([]model.ShortenURL, error) {
-	user, err := auth.UserFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
+func (m *URLManager) GetBatchURLByUserID(ctx context.Context, user *model.User) ([]model.ShortenURL, error) {
 	urls, err := m.repo.FindBatchShortURLByUserID(ctx, user.ID)
 	if err != nil {
 		return nil, err

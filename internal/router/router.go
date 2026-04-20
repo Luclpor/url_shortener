@@ -13,7 +13,7 @@ import (
 
 func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService, userAuth auth.UserAuthentication) (*chi.Mux, error) {
 	r := chi.NewRouter()
-	handler := api.NewHandler(cfg, healthService, manager)
+	handler := api.NewHandler(cfg, healthService, manager, userAuth)
 	r.Use(middleware.RequestID)
 	r.Use(logger.RequestLogger)
 	r.Use(middleware.Recoverer)

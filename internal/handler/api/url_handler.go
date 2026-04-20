@@ -11,21 +11,24 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
 )
 
 type Handler struct {
-	cfg     *config.Config
-	manager *service.URLManager
-	health  *service.HealthService
+	cfg         *config.Config
+	manager     *service.URLManager
+	authService auth.UserAuthentication
+	health      *service.HealthService
 }
 
-func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager) *Handler {
+func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication) *Handler {
 	return &Handler{
-		cfg:     cfg,
-		health:  health,
-		manager: manager,
+		cfg:         cfg,
+		health:      health,
+		authService: userAuth,
+		manager:     manager,
 	}
 }
 
@@ -40,8 +43,13 @@ func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 			render.JSON(w, r, err)
 			return
 		}
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, err := h.manager.CreateBatchURL(ctx, model)
+		responseModel, err := h.manager.CreateBatchURL(ctx, model, user)
 		if err != nil {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
@@ -71,7 +79,12 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		responseModel, err := h.manager.CreateShortURL(ctx, model.URL)
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		responseModel, err := h.manager.CreateShortURL(ctx, model.URL, user)
 		if err != nil && !errors.Is(err, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusInternalServerError)
 			render.JSON(w, r, err)
@@ -97,7 +110,12 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 			render.PlainText(w, r, http.StatusText(http.StatusBadRequest))
 			return
 		}
-		su, createErr := h.manager.CreateShortURL(ctx, string(body))
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		su, createErr := h.manager.CreateShortURL(ctx, string(body), user)
 		if createErr != nil && !errors.Is(createErr, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusInternalServerError)
 			render.PlainText(w, r, http.StatusText(http.StatusInternalServerError))
@@ -136,7 +154,12 @@ func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*1330)
 		defer cancel()
-		urls, err := h.manager.GetBatchURLByUserID(ctx)
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		urls, err := h.manager.GetBatchURLByUserID(ctx, user)
 		if err != nil {
 			if errors.Is(err, appErrors.ErrNotFound) {
 				render.Status(r, http.StatusNoContent)

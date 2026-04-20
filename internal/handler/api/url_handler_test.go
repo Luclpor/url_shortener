@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	modelapi "github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	storageMock "github.com/Luclpor/url_shortener.git/internal/storage/mock"
 	"github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/google/uuid"
@@ -20,6 +20,27 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )
+
+type testUserAuth struct {
+	user *model.User
+	err  error
+}
+
+func (a testUserAuth) CreateEncryptedUser() (*model.User, string, error) {
+	return a.user, "", a.err
+}
+
+func (a testUserAuth) DecryptUser(string) (*model.User, error) {
+	return a.user, a.err
+}
+
+func (a testUserAuth) GetUserFromContext(context.Context) (*model.User, error) {
+	return a.user, a.err
+}
+
+func (a testUserAuth) SetUserOnContext(ctx context.Context, _ *model.User) context.Context {
+	return ctx
+}
 
 func TestCreateShortenURLJSONHandler(t *testing.T) {
 	type want struct {
@@ -60,6 +81,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockRep := storageMock.NewMockURLRepository(ctrl)
+			user := &model.User{ID: uuid.New()}
 
 			var requestBody modelapi.CreateShortenReq
 			err := json.Unmarshal([]byte(tt.body), &requestBody)
@@ -73,7 +95,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 							return nil, false
 						}),
 					mockRep.EXPECT().
-						Save(gomock.Any(), gomock.Any(), "https://www.google.com", gomock.Any()).
+						Save(gomock.Any(), gomock.Any(), "https://www.google.com", user.ID).
 						DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 							return &model.ShortenURL{
 								ShortURL:    "gle",
@@ -89,7 +111,7 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 						return nil, false
 					})
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), requestBody.URL, gomock.Any()).
+					Save(gomock.Any(), gomock.Any(), requestBody.URL, user.ID).
 					DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.ShortenURL{
@@ -101,11 +123,10 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 				tt.want.response = cfg.BaseAddressShort + "/"
 			}
 			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(cfg, nil, manager)
+			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user})
 			createHandler := handler.NewCreateShortenUlrJSONHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
-			req = req.WithContext(auth.WithUser(req.Context(), &model.User{ID: uuid.New()}))
 
 			rec := httptest.NewRecorder()
 			createHandler(rec, req)
@@ -176,6 +197,7 @@ func TestCreatedShortURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockRep := storageMock.NewMockURLRepository(ctrl)
+			user := &model.User{ID: uuid.New()}
 
 			if tt.name == "already exist" {
 
@@ -186,7 +208,7 @@ func TestCreatedShortURL(t *testing.T) {
 							return nil, false
 						}),
 					mockRep.EXPECT().
-						Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
+						Save(gomock.Any(), gomock.Any(), tt.body, user.ID).
 						DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 							return &model.ShortenURL{
 								ShortURL:    "gle",
@@ -202,7 +224,7 @@ func TestCreatedShortURL(t *testing.T) {
 						return nil, false
 					})
 				mockRep.EXPECT().
-					Save(gomock.Any(), gomock.Any(), tt.body, gomock.Any()).
+					Save(gomock.Any(), gomock.Any(), tt.body, user.ID).
 					DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
 						assert.Equal(t, generatedShortURL, shortURL)
 						return &model.ShortenURL{
@@ -215,11 +237,10 @@ func TestCreatedShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(cfg, nil, manager)
+			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user})
 			createHandler := handler.NewCreateHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
-			req = req.WithContext(auth.WithUser(req.Context(), &model.User{ID: uuid.New()}))
 
 			rec := httptest.NewRecorder()
 			createHandler(rec, req)
@@ -295,7 +316,7 @@ func TestGetShortURL(t *testing.T) {
 			}
 
 			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(nil, nil, manager)
+			handler := NewHandler(nil, nil, manager, nil)
 			getHandler := handler.NewGetterHandler()
 
 			mux := http.NewServeMux()

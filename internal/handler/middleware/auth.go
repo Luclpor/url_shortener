@@ -42,7 +42,7 @@ func Auth(userAuth auth.UserAuthentication) func(http.Handler) http.Handler {
 				user = existingUser
 			}
 
-			ctx := auth.WithUser(r.Context(), user)
+			ctx := userAuth.SetUserOnContext(r.Context(), user)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
