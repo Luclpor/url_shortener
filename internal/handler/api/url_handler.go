@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path"
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
@@ -69,7 +70,7 @@ func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 
 func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*666)
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
 		defer cancel()
 		var model api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
@@ -168,6 +169,9 @@ func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 			}
 			render.Status(r, http.StatusInternalServerError)
 			return
+		}
+		for i, url := range urls {
+			urls[i].ShortURL = path.Join(h.cfg.BaseAddressShort, url.ShortURL)
 		}
 		render.JSON(w, r, urls)
 	}
