@@ -18,5 +18,3 @@ create trigger tiub_service_user_audit
 alter table url_shortener add column user_id uuid null;
 
 alter table url_shortener drop constraint if exists original_url_unique;
-alter table url_shortener drop constraint if exists original_url_user_id_unique;
-alter table url_shortener add  CONSTRAINT original_url_user_id_unique UNIQUE (original_url, user_id);
