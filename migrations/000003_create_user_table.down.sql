@@ -1,4 +1,4 @@
-alter table url_shortener drop CONSTRAINT constraint if exists original_url_user_id_unique;
+alter table url_shortener drop CONSTRAINT if exists original_url_user_id_unique;
 ALTER TABLE url_shortener
 DROP COLUMN IF EXISTS user_id;
 

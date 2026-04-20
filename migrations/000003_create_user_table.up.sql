@@ -15,7 +15,7 @@ create trigger tiub_service_user_audit
                          for each row
                          execute procedure audit_table();
 
-alter table url_shortener add column user_id uuid not null;
+alter table url_shortener add column user_id uuid null;
 
 alter table url_shortener drop constraint if exists original_url_unique;
 alter table url_shortener drop constraint if exists original_url_user_id_unique;
