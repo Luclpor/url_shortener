@@ -1,0 +1,1 @@
+alter table url_shortener drop  constraint if exists original_url_unique;
