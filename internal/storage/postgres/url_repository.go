@@ -72,7 +72,7 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 
 func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error) {
 	const query = `
-		SELECT short_url, original_url, correlation_id
+		SELECT short_url, original_url, correlation_id, user_id
 		FROM url_shortener
 		WHERE original_url = $1 AND user_id = $2
 	`
@@ -100,11 +100,11 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL s
 		"user_id", userId.String(),
 	)
 	existModel, err := r.FindByOriginalURL(ctx, originalURL, userId)
-	if errors.Is(err, pgx.ErrNoRows) {
-		if err != nil {
-			return nil, err
-		}
+	if existModel != nil && err == nil {
 		return existModel, appErrors.ErrAlreadyExists
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
 	}
 	var u = new(model.ShortenURL)
 	err = r.pool.QueryRow(ctx, query, shortURL, originalURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
