@@ -103,7 +103,7 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL s
 	if existModel != nil && err == nil {
 		return existModel, appErrors.ErrAlreadyExists
 	}
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if err != nil && !errors.Is(err, appErrors.ErrNotFound) {
 		return nil, err
 	}
 	var u = new(model.ShortenURL)
