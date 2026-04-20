@@ -31,11 +31,8 @@ func Auth(userAuth auth.UserAuthentication) func(http.Handler) http.Handler {
 				user = newUser
 
 				http.SetCookie(w, &http.Cookie{
-					Name:     "user_id",
-					Value:    encryptedUserID,
-					Path:     "/",
-					HttpOnly: true,
-					SameSite: http.SameSiteLaxMode,
+					Name:  "user_id",
+					Value: encryptedUserID,
 				})
 			} else {
 				logger.SugarLogger.Info("cookie found")
