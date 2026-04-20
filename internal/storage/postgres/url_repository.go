@@ -119,7 +119,7 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 	shortenURLs := make([]model.ShortenURL, 0, len(dtos))
 	const query = `
 		INSERT INTO url_shortener (short_url, original_url, correlation_id, user_id)
-		VALUES ($1, $2, $3)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id, short_url, original_url, correlation_id, user_id, created_at, updated_at
 	`
 
