@@ -142,11 +142,41 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
+			if errors.Is(err, appErrors.ErrURLWasDeleted) {
+				w.WriteHeader(http.StatusGone)
+				return
+			}
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 		w.Header().Add("Location", s.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+	}
+}
+
+func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
+		defer cancel()
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		var model api.URLDeleteBatchAPIModel
+		err = json.NewDecoder(r.Body).Decode(&model)
+		if err != nil {
+			render.Status(r, http.StatusBadRequest)
+			render.JSON(w, r, err)
+			return
+		}
+		err = h.manager.DeleteBatch(ctx, model, user)
+		if err != nil {
+			render.Status(r, http.StatusInternalServerError)
+			return
+		}
+		render.Status(r, http.StatusAccepted)
+		return
 	}
 }
 

@@ -22,11 +22,41 @@ func NewURLRepository(pool *pgxpool.Pool) *URLRepository {
 	return &URLRepository{pool: pool}
 }
 
+func (r *URLRepository) FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+	const query = `
+		SELECT short_url, original_url, user_id
+		FROM url_shortener
+		WHERE short_url = ANY($1)
+		  AND user_id = $2 AND is_deleted = false
+	`
+	urls := []model.ShortenURL{}
+	rows, err := r.pool.Query(ctx, query, shortURLs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		url := model.ShortenURL{}
+		err = rows.Scan(&url.ShortURL, &url.OriginalURL, &url.UserID)
+		if err != nil {
+			return nil, err
+		}
+		urls = append(urls, url)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(urls) == 0 {
+		return nil, appErrors.ErrNotFound
+	}
+	return urls, nil
+}
+
 func (r *URLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, user_id
 		FROM url_shortener
-		WHERE user_id = $1
+		WHERE user_id = $1 AND is_deleted = false
 	`
 
 	urls := []model.ShortenURL{}
@@ -53,13 +83,13 @@ func (r *URLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uu
 
 func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
 	const query = `
-		SELECT short_url, original_url, user_id
+		SELECT short_url, original_url, user_id, is_deleted
 		FROM url_shortener
 		WHERE short_url = $1
 	`
 
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
+	err := r.pool.QueryRow(ctx, query, shortURL).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID, &u.IsDeleted)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, false
@@ -74,7 +104,7 @@ func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, u
 	const query = `
 		SELECT short_url, original_url, correlation_id, user_id
 		FROM url_shortener
-		WHERE original_url = $1 AND user_id = $2
+		WHERE original_url = $1 AND user_id = $2 AND is_deleted = false
 	`
 	logger.SugarLogger.Infow("user",
 		"user_id", userId.String(),
@@ -151,6 +181,32 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 	}
 
 	return shortenURLs, nil
+}
+
+func (r *URLRepository) DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	const query = `
+		UPDATE url_shortener
+		SET is_deleted = true
+		WHERE short_url = ANY($1)
+		  AND user_id = $2
+	`
+
+	for k, v := range deleteShortURLs {
+		if len(v) == 0 {
+			continue
+		}
+		_, err = tx.Exec(ctx, query, v, k)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
 }
 
 var _ service.URLRepository = (*URLRepository)(nil)

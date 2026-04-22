@@ -1,0 +1,1 @@
+alter table url_shortener add column if not exists is_deleted bool default false not null;

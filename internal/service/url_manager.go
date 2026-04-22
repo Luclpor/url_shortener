@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
@@ -15,19 +16,29 @@ import (
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
 
 type URLRepository interface {
+	FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
 	FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error)
 	Save(ctx context.Context, shortURL string, fullURL string, userId uuid.UUID) (*model.ShortenURL, error)
 	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
+	DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error
 }
 
 type URLManager struct {
-	repo URLRepository
+	repo    URLRepository
+	msgChan chan dto.URLDto
 }
 
 func NewURLManager(repo URLRepository) *URLManager {
-	return &URLManager{repo: repo}
+	um := &URLManager{
+		repo:    repo,
+		msgChan: make(chan dto.URLDto, 100),
+	}
+
+	go um.flushMessages()
+
+	return um
 }
 
 func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string, user *model.User) (*api.ShortenResp, error) {
@@ -88,6 +99,9 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 
 func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.ShortenURL, error) {
 	url, b := m.repo.FindByShortURL(ctx, shortURL)
+	if url.IsDeleted {
+		return nil, appErrors.ErrURLWasDeleted
+	}
 	if !b {
 		return nil, appErrors.ErrNotFound
 	}
@@ -112,4 +126,48 @@ func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int
 		m.getUniqueKey(ctx, longURL, count, userId)
 	}
 	return key, true
+}
+
+func (m *URLManager) DeleteBatch(ctx context.Context, apiModel api.URLDeleteBatchAPIModel, user *model.User) error {
+	urls, err := m.repo.FindBatchShortURLsByUserID(ctx, apiModel.ShortURLs, user.ID)
+	if err != nil {
+		return err
+	}
+	if len(urls) != len(apiModel.ShortURLs) {
+		return appErrors.ErrNotFound
+	}
+	for _, url := range urls {
+		m.msgChan <- dto.URLDto{
+			ShortURL: url.ShortURL,
+			UserID:   user.ID,
+		}
+	}
+	return nil
+}
+
+func (m *URLManager) flushMessages() {
+	// будем сохранять сообщения, накопленные за последние 10 секунд
+	ticker := time.NewTicker(10 * time.Second)
+
+	messages := make(map[uuid.UUID][]string)
+
+	for {
+		select {
+		case msg := <-m.msgChan:
+			messages[msg.UserID] = append(messages[msg.UserID], msg.ShortURL)
+		case <-ticker.C:
+			// подождём, пока придёт хотя бы одно сообщение
+			if len(messages) == 0 {
+				continue
+			}
+			// сохраним все пришедшие сообщения одновременно
+			err := m.repo.DeleteBatch(context.Background(), messages)
+			if err != nil {
+				// не будем стирать сообщения, попробуем отправить их чуть позже
+				continue
+			}
+			// сотрём успешно отосланные сообщения
+			messages = make(map[uuid.UUID][]string)
+		}
+	}
 }

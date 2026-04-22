@@ -32,6 +32,27 @@ func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 	}, nil
 }
 
+func (db *InMemoryDB) FindBatchShortURLsByUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	foundURLs := make([]model.ShortenURL, 0)
+	shortenURLsMap := make(map[string]struct{})
+	for _, shortURL := range shortURLs {
+		shortenURLsMap[shortURL] = struct{}{}
+	}
+
+	for _, u := range db.urls {
+		if u.UserID != userID {
+			continue
+		}
+		if _, ok := shortenURLsMap[u.ShortURL]; !ok {
+			foundURLs = append(foundURLs, u)
+		}
+	}
+
+	return foundURLs, nil
+}
+
 func (db *InMemoryDB) FindBatchShortURLByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -104,6 +125,26 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 		return nil, err
 	}
 	return models, nil
+}
+
+func (db *InMemoryDB) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UUID][]string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for userID, v := range deleteShortURLs {
+		mapURLs := make(map[string]struct{})
+		for _, u := range v {
+			mapURLs[u] = struct{}{}
+		}
+		for i, u := range db.urls {
+			if u.UserID != userID {
+				continue
+			}
+			if _, ok := mapURLs[u.ShortURL]; !ok {
+				db.urls[i].IsDeleted = true
+			}
+		}
+	}
+	return nil
 }
 
 func (db *InMemoryDB) Close() error {

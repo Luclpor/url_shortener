@@ -24,6 +24,7 @@ func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *s
 		r.Use(customMidlleware.Auth(userAuth))
 		r.Post("/api/shorten", handler.NewCreateShortenUlrJSONHandler())
 		r.Get("/api/user/urls", handler.NewGetBatchHandler())
+		r.Delete("/api/user/urls", handler.NewDeleteBatchHandler())
 		r.Post("/", handler.NewCreateHandler())
 		r.Post("/api/shorten/batch", handler.NewCreateBatchShortenHandler())
 		r.Get("/{id}", handler.NewGetterHandler())
