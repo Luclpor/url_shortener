@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
@@ -22,7 +21,7 @@ func TestURLManager_GetURL(t *testing.T) {
 		name    string
 		args    args
 		want    *model.ShortenURL
-		wantErr bool
+		wantErr error
 	}{
 		{
 			name: "success",
@@ -33,15 +32,23 @@ func TestURLManager_GetURL(t *testing.T) {
 				ShortURL:    "gle",
 				OriginalURL: "https://google.com",
 			},
-			wantErr: false,
+			wantErr: nil,
 		},
 		{
-			name: "failure",
+			name: "not found",
 			args: args{
 				shortURL: "ru",
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: errors2.ErrNotFound,
+		},
+		{
+			name: "deleted url",
+			args: args{
+				shortURL: "gone",
+			},
+			want:    nil,
+			wantErr: errors2.ErrURLWasDeleted,
 		},
 	}
 
@@ -51,38 +58,39 @@ func TestURLManager_GetURL(t *testing.T) {
 			defer ctrl.Finish()
 			mockRep := mock.NewMockURLRepository(ctrl)
 
-			var res *model.ShortenURL
-			if tt.want != nil {
-				res = &model.ShortenURL{
-					ShortURL:    tt.want.ShortURL,
-					OriginalURL: tt.want.OriginalURL,
-				}
+			switch tt.name {
+			case "success":
+				mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
+					Return(&model.ShortenURL{
+						ShortURL:    tt.want.ShortURL,
+						OriginalURL: tt.want.OriginalURL,
+					}, true)
+			case "deleted url":
+				mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
+					Return(&model.ShortenURL{
+						ShortURL:  tt.args.shortURL,
+						IsDeleted: true,
+					}, true)
+			default:
+				mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
+					Return(nil, false)
 			}
-
-			var b = false
-			if res != nil {
-				b = true
-			}
-
-			mockRep.EXPECT().FindByShortURL(gomock.Any(), tt.args.shortURL).
-				Return(res, b)
 
 			manager := &URLManager{
 				repo: mockRep,
 			}
 			got, err := manager.GetURL(context.Background(), tt.args.shortURL)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GetURL() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GetURL() got = %v, want %v", got, tt.want)
-			}
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func TestURLManager_TryCreateShortURL(t *testing.T) {
+func TestURLManager_CreateShortURL(t *testing.T) {
 	type args struct {
 		longURL string
 	}
@@ -111,10 +119,8 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 				longURL: "https://example.com/new",
 			},
 			alreadyExist: false,
-			want: &api.ShortenResp{
-				Result: "shortik,",
-			},
-			wantErr: nil,
+			want:         nil,
+			wantErr:      nil,
 		},
 	}
 
@@ -131,12 +137,8 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			mockRep.EXPECT().
 				FindByShortURL(gomock.Any(), gomock.Any()).
 				Return(nil, false).
-				AnyTimes()
+				Times(1)
 
-			saveResult := &model.ShortenURL{
-				ShortURL:    tt.want.Result,
-				OriginalURL: tt.args.longURL,
-			}
 			saveErr := tt.wantErr
 			if !tt.alreadyExist {
 				saveErr = nil
@@ -148,6 +150,13 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 					assert.Len(t, shortURL, 5)
 					assert.Equal(t, tt.args.longURL, longURL)
 					assert.Equal(t, user.ID, userID)
+					saveResult := &model.ShortenURL{
+						ShortURL:    shortURL,
+						OriginalURL: tt.args.longURL,
+					}
+					if tt.alreadyExist {
+						saveResult.ShortURL = tt.want.Result
+					}
 					return saveResult, saveErr
 				})
 
@@ -157,7 +166,12 @@ func TestURLManager_TryCreateShortURL(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-			assert.Equal(t, tt.want, got)
+			if tt.alreadyExist {
+				assert.Equal(t, tt.want, got)
+				return
+			}
+			assert.NotNil(t, got)
+			assert.Len(t, got.Result, 5)
 		})
 	}
 }

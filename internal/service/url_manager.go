@@ -99,11 +99,11 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 
 func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.ShortenURL, error) {
 	url, b := m.repo.FindByShortURL(ctx, shortURL)
+	if !b || url == nil {
+		return nil, appErrors.ErrNotFound
+	}
 	if url.IsDeleted {
 		return nil, appErrors.ErrURLWasDeleted
-	}
-	if !b {
-		return nil, appErrors.ErrNotFound
 	}
 	return url, nil
 }

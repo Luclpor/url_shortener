@@ -295,6 +295,13 @@ func TestGetShortURL(t *testing.T) {
 				code: http.StatusNoContent,
 			},
 		},
+		{
+			name:     "deleted url",
+			shortURL: "gone",
+			want: want{
+				code: http.StatusGone,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -308,6 +315,13 @@ func TestGetShortURL(t *testing.T) {
 					Return(&model.ShortenURL{
 						ShortURL:    tt.shortURL,
 						OriginalURL: tt.want.location,
+					}, true)
+			} else if tt.name == "deleted url" {
+				mockRep.EXPECT().
+					FindByShortURL(gomock.Any(), tt.shortURL).
+					Return(&model.ShortenURL{
+						ShortURL:  tt.shortURL,
+						IsDeleted: true,
 					}, true)
 			} else {
 				mockRep.EXPECT().

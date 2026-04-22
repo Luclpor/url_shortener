@@ -21,7 +21,7 @@ func (r *URLRepository) AddNewUser(ctx context.Context) (*model.User, error) {
 	return u, nil
 }
 
-func (r *URLRepository) GetUserByID(ctx context.Context, userId uuid.UUID) (*model.User, error) {
+func (r *URLRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
 	const query = `
 		SELECT id
 		FROM service_user
@@ -29,7 +29,7 @@ func (r *URLRepository) GetUserByID(ctx context.Context, userId uuid.UUID) (*mod
 	`
 
 	var u model.User
-	err := r.pool.QueryRow(ctx, query, userId).Scan(&u.ID)
+	err := r.pool.QueryRow(ctx, query, userID).Scan(&u.ID)
 	if err != nil {
 		return nil, err
 	}
