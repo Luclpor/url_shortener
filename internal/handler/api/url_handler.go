@@ -163,7 +163,7 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		var model api.URLDeleteBatchAPIModel
+		var model []string
 		err = json.NewDecoder(r.Body).Decode(&model)
 		if err != nil {
 			render.Status(r, http.StatusBadRequest)
@@ -172,10 +172,10 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 		}
 		err = h.manager.DeleteBatch(ctx, model, user)
 		if err != nil {
-			render.Status(r, http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		render.Status(r, http.StatusAccepted)
+		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 }

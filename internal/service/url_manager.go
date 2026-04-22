@@ -19,8 +19,8 @@ type URLRepository interface {
 	FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
-	FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error)
-	Save(ctx context.Context, shortURL string, fullURL string, userId uuid.UUID) (*model.ShortenURL, error)
+	FindByOriginalURL(ctx context.Context, longURL string, userID uuid.UUID) (*model.ShortenURL, error)
+	Save(ctx context.Context, shortURL string, fullURL string, userID uuid.UUID) (*model.ShortenURL, error)
 	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
 	DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error
 }
@@ -116,24 +116,24 @@ func (m *URLManager) GetBatchURLByUserID(ctx context.Context, user *model.User) 
 	return urls, nil
 }
 
-func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int, userId uuid.UUID) (string, bool) {
+func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int, userID uuid.UUID) (string, bool) {
 	if count > 100 {
 		return "", false
 	}
 	key := GenerateRandomString(5)
 	_, ok := m.repo.FindByShortURL(ctx, key)
 	if ok {
-		m.getUniqueKey(ctx, longURL, count, userId)
+		m.getUniqueKey(ctx, longURL, count, userID)
 	}
 	return key, true
 }
 
-func (m *URLManager) DeleteBatch(ctx context.Context, apiModel api.URLDeleteBatchAPIModel, user *model.User) error {
-	urls, err := m.repo.FindBatchShortURLsByUserID(ctx, apiModel.ShortURLs, user.ID)
+func (m *URLManager) DeleteBatch(ctx context.Context, shortURLs []string, user *model.User) error {
+	urls, err := m.repo.FindBatchShortURLsByUserID(ctx, shortURLs, user.ID)
 	if err != nil {
 		return err
 	}
-	if len(urls) != len(apiModel.ShortURLs) {
+	if len(urls) != len(shortURLs) {
 		return appErrors.ErrNotFound
 	}
 	for _, url := range urls {
