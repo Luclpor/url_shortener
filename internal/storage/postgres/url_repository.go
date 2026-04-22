@@ -22,7 +22,7 @@ func NewURLRepository(pool *pgxpool.Pool) *URLRepository {
 	return &URLRepository{pool: pool}
 }
 
-func (r *URLRepository) FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+func (r *URLRepository) FindByShortURLsAndUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, user_id
 		FROM url_shortener
@@ -52,7 +52,7 @@ func (r *URLRepository) FindBatchShortURLsByUserID(ctx context.Context, shortURL
 	return urls, nil
 }
 
-func (r *URLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
+func (r *URLRepository) FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, user_id
 		FROM url_shortener

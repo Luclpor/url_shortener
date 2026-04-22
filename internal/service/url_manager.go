@@ -16,8 +16,8 @@ import (
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
 
 type URLRepository interface {
-	FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
-	FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
+	FindByShortURLsAndUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
+	FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
 	FindByOriginalURL(ctx context.Context, longURL string, userID uuid.UUID) (*model.ShortenURL, error)
 	Save(ctx context.Context, shortURL string, fullURL string, userID uuid.UUID) (*model.ShortenURL, error)
@@ -109,7 +109,7 @@ func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.Shorte
 }
 
 func (m *URLManager) GetBatchURLByUserID(ctx context.Context, user *model.User) ([]model.ShortenURL, error) {
-	urls, err := m.repo.FindBatchShortURLByUserID(ctx, user.ID)
+	urls, err := m.repo.FindAllByUserID(ctx, user.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int
 }
 
 func (m *URLManager) DeleteBatch(ctx context.Context, shortURLs []string, user *model.User) error {
-	urls, err := m.repo.FindBatchShortURLsByUserID(ctx, shortURLs, user.ID)
+	urls, err := m.repo.FindByShortURLsAndUserID(ctx, shortURLs, user.ID)
 	if err != nil {
 		return err
 	}

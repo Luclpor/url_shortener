@@ -32,7 +32,7 @@ func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 	}, nil
 }
 
-func (db *InMemoryDB) FindBatchShortURLsByUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+func (db *InMemoryDB) FindByShortURLsAndUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	foundURLs := make([]model.ShortenURL, 0)
@@ -53,7 +53,7 @@ func (db *InMemoryDB) FindBatchShortURLsByUserID(_ context.Context, shortURLs []
 	return foundURLs, nil
 }
 
-func (db *InMemoryDB) FindBatchShortURLByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
+func (db *InMemoryDB) FindAllByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	urls := make([]model.ShortenURL, 0)
