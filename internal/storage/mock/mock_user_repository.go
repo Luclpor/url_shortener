@@ -43,6 +43,20 @@ func (m *MockURLRepository) EXPECT() *MockURLRepositoryMockRecorder {
 	return m.recorder
 }
 
+// DeleteBatch mocks base method.
+func (m *MockURLRepository) DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBatch", ctx, deleteShortURLs)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBatch indicates an expected call of DeleteBatch.
+func (mr *MockURLRepositoryMockRecorder) DeleteBatch(ctx, deleteShortURLs any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBatch", reflect.TypeOf((*MockURLRepository)(nil).DeleteBatch), ctx, deleteShortURLs)
+}
+
 // FindBatchShortURLByUserID mocks base method.
 func (m *MockURLRepository) FindBatchShortURLByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	m.ctrl.T.Helper()
@@ -56,6 +70,21 @@ func (m *MockURLRepository) FindBatchShortURLByUserID(ctx context.Context, userI
 func (mr *MockURLRepositoryMockRecorder) FindBatchShortURLByUserID(ctx, userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindBatchShortURLByUserID", reflect.TypeOf((*MockURLRepository)(nil).FindBatchShortURLByUserID), ctx, userID)
+}
+
+// FindBatchShortURLsByUserID mocks base method.
+func (m *MockURLRepository) FindBatchShortURLsByUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "FindBatchShortURLsByUserID", ctx, shortURLs, userID)
+	ret0, _ := ret[0].([]model.ShortenURL)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// FindBatchShortURLsByUserID indicates an expected call of FindBatchShortURLsByUserID.
+func (mr *MockURLRepositoryMockRecorder) FindBatchShortURLsByUserID(ctx, shortURLs, userID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindBatchShortURLsByUserID", reflect.TypeOf((*MockURLRepository)(nil).FindBatchShortURLsByUserID), ctx, shortURLs, userID)
 }
 
 // FindByOriginalURL mocks base method.
