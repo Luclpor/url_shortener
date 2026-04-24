@@ -205,7 +205,7 @@ func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 		urls, err := h.manager.GetBatchURLByUserID(r.Context(), user)
 		if err != nil {
 			if errors.Is(err, appErrors.ErrNotFound) {
-				render.Status(r, http.StatusNoContent)
+				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			h.logger.Error("failed to get short urls:", zap.Error(err))
