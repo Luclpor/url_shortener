@@ -36,35 +36,41 @@ func NewHandler(cfg *config.Config, health *service.HealthService, manager *serv
 
 func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req []api.CreateShortenReq
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		var model []api.CreateShortenReq
+		err := json.NewDecoder(r.Body).Decode(&model)
+		if err != nil {
+			h.logger.Error("Failed to decode create shorten request", zap.Error(err))
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
 			h.logger.Error("failed to get user from context:", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
-		resp, err := h.manager.CreateBatchURL(r.Context(), req, user)
+		w.Header().Set("Content-Type", "application/json")
+		responseModel, err := h.manager.CreateBatchURL(r.Context(), model, user)
 		if err != nil {
-			h.logger.Error("create batch url failed: ", zap.Error(err))
+			h.logger.Error("failed to create shorten request", zap.Error(err))
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
-		if len(resp) == 0 {
+		if len(responseModel) == 0 {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-
-		for i := range resp {
-			resp[i].ShortURL = h.cfg.BaseAddressShort + "/" + resp[i].ShortURL
+		render.Status(r, http.StatusCreated)
+		for i := range responseModel {
+			joined, err := url.JoinPath(h.cfg.BaseAddressShort, responseModel[i].ShortURL)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				h.logger.Error("failed to join short url:", zap.Error(err))
+				return
+			}
+			responseModel[i].ShortURL = joined
 		}
-		render.JSON(w, r, resp)
+		render.JSON(w, r, responseModel)
 	}
 }
 
