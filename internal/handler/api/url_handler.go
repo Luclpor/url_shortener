@@ -10,7 +10,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/Luclpor/url_shortener.git/internal/storage"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
 	"go.uber.org/zap"
@@ -19,12 +19,12 @@ import (
 type Handler struct {
 	cfg         *config.Config
 	manager     *service.URLManager
-	authService storage.UserAuthentication
+	authService auth.UserAuthentication
 	health      *service.HealthService
 	logger      *zap.Logger
 }
 
-func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth storage.UserAuthentication, appLogger *zap.Logger) *Handler {
+func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication, appLogger *zap.Logger) *Handler {
 	return &Handler{
 		cfg:         cfg,
 		health:      health,

@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
-	"github.com/Luclpor/url_shortener.git/internal/storage"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"go.uber.org/zap"
 )
 
-func Auth(userAuth storage.UserAuthentication, appLogger *zap.Logger) func(http.Handler) http.Handler {
+func Auth(userAuth auth.UserAuthentication, appLogger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var user *model.User

@@ -13,6 +13,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type UserAuthentication interface {
+	CreateEncryptedUser() (*model.User, string, error)
+	DecryptUser(value string) (*model.User, error)
+	GetUserFromContext(ctx context.Context) (*model.User, error)
+	SetUserOnContext(ctx context.Context, user *model.User) context.Context
+}
+
 func generateRandom(size int) ([]byte, error) {
 	// генерируем криптостойкие случайные байты в b
 	b := make([]byte, size)
@@ -29,7 +36,7 @@ type UserAuth struct {
 	userRepo storage.UserRepository
 }
 
-func InitAuthService(key []byte, ur storage.UserRepository) (storage.UserAuthentication, error) {
+func InitAuthService(key []byte, ur storage.UserRepository) (UserAuthentication, error) {
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

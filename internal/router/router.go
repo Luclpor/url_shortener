@@ -7,13 +7,13 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/handler/api"
 	customMidlleware "github.com/Luclpor/url_shortener.git/internal/handler/middleware"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/Luclpor/url_shortener.git/internal/storage"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
 
-func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService, userAuth storage.UserAuthentication, appLogger *zap.Logger) (*chi.Mux, error) {
+func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService, userAuth auth.UserAuthentication, appLogger *zap.Logger) (*chi.Mux, error) {
 	r := chi.NewRouter()
 	handler := api.NewHandler(cfg, healthService, manager, userAuth, appLogger)
 	r.Use(middleware.RequestID)

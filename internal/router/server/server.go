@@ -15,7 +15,6 @@ import (
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
 	"github.com/Luclpor/url_shortener.git/internal/service/auth"
-	"github.com/Luclpor/url_shortener.git/internal/storage"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 	"go.uber.org/zap"
@@ -42,7 +41,7 @@ func NewServer() (*Server, error) {
 	}
 	var repo service.URLRepository
 	var healthChecker service.HealthChecker
-	var userAuth storage.UserAuthentication
+	var userAuth auth.UserAuthentication
 	var closers []func() error
 	if cfg.Postgres.DataBaseDSN != "" {
 		pool, err := postgres.NewPool(context.Background(), cfg.Postgres, appLogger)
