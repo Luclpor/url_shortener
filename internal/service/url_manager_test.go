@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/Luclpor/url_shortener.git/internal/config"
+	"github.com/Luclpor/url_shortener.git/internal/logger"
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/storage/mock"
@@ -132,7 +134,8 @@ func TestURLManager_CreateShortURL(t *testing.T) {
 			mockRep := mock.NewMockURLRepository(ctrl)
 			user := &model.User{ID: uuid.New()}
 
-			m := NewURLManager(mockRep)
+			appLog, _ := logger.InitLogger(config.ProdEnv)
+			m := NewURLManager(mockRep, appLog)
 
 			mockRep.EXPECT().
 				FindByShortURL(gomock.Any(), gomock.Any()).

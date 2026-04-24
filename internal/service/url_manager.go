@@ -16,6 +16,8 @@ import (
 
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
 
+const maxLimitMessages = 1000
+
 type URLRepository interface {
 	FindByShortURLsAndUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
 	FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
@@ -27,16 +29,18 @@ type URLRepository interface {
 }
 
 type URLManager struct {
-	repo      URLRepository
-	msgChan   chan dto.URLDto
-	appLogger *zap.Logger
+	repo             URLRepository
+	msgChan          chan dto.URLDto
+	maxLimitMessages int
+	appLogger        *zap.Logger
 }
 
 func NewURLManager(repo URLRepository, appLogger *zap.Logger) *URLManager {
 	um := &URLManager{
-		repo:      repo,
-		msgChan:   make(chan dto.URLDto, 100),
-		appLogger: appLogger,
+		repo:             repo,
+		msgChan:          make(chan dto.URLDto, 100),
+		appLogger:        appLogger,
+		maxLimitMessages: maxLimitMessages,
 	}
 
 	go um.flushMessages()
@@ -163,6 +167,10 @@ func (m *URLManager) flushMessages() {
 			// подождём, пока придёт хотя бы одно сообщение
 			if len(messages) == 0 {
 				continue
+			}
+			if len(messages) > m.maxLimitMessages {
+				m.appLogger.Warn("max limit exceeded", zap.Int("count", len(messages)))
+				messages = make(map[uuid.UUID][]string)
 			}
 			// сохраним все пришедшие сообщения одновременно
 			err := m.repo.DeleteBatch(context.Background(), messages)
