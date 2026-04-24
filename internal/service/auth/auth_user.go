@@ -9,13 +9,9 @@ import (
 	"fmt"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
+	"github.com/Luclpor/url_shortener.git/internal/storage"
 	"github.com/google/uuid"
 )
-
-type UserRepository interface {
-	AddNewUser(ctx context.Context) (*model.User, error)
-	GetUserByID(ctx context.Context, id uuid.UUID) (*model.User, error)
-}
 
 func generateRandom(size int) ([]byte, error) {
 	// генерируем криптостойкие случайные байты в b
@@ -28,19 +24,12 @@ func generateRandom(size int) ([]byte, error) {
 	return b, nil
 }
 
-type UserAuthentication interface {
-	CreateEncryptedUser() (*model.User, string, error)
-	DecryptUser(value string) (*model.User, error)
-	GetUserFromContext(ctx context.Context) (*model.User, error)
-	SetUserOnContext(ctx context.Context, user *model.User) context.Context
-}
-
 type UserAuth struct {
 	aesgcm   cipher.AEAD
-	userRepo UserRepository
+	userRepo storage.UserRepository
 }
 
-func InitAuthService(key []byte, ur UserRepository) (UserAuthentication, error) {
+func InitAuthService(key []byte, ur storage.UserRepository) (storage.UserAuthentication, error) {
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err

@@ -1,29 +1,30 @@
 package api
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
-	"time"
+	"net/url"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
-	"github.com/Luclpor/url_shortener.git/internal/service/auth"
+	"github.com/Luclpor/url_shortener.git/internal/storage"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
+	"go.uber.org/zap"
 )
 
 type Handler struct {
 	cfg         *config.Config
 	manager     *service.URLManager
-	authService auth.UserAuthentication
+	authService storage.UserAuthentication
 	health      *service.HealthService
+	logger      *zap.SugaredLogger
 }
 
-func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication) *Handler {
+func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth storage.UserAuthentication) *Handler {
 	return &Handler{
 		cfg:         cfg,
 		health:      health,
@@ -34,43 +35,40 @@ func NewHandler(cfg *config.Config, health *service.HealthService, manager *serv
 
 func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*120)
-		defer cancel()
-		var model []api.CreateShortenReq
-		err := json.NewDecoder(r.Body).Decode(&model)
-		if err != nil {
-			render.Status(r, http.StatusBadRequest)
-			render.JSON(w, r, err)
+		var req []api.CreateShortenReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.logger.Errorf("failed to get user from context: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		responseModel, err := h.manager.CreateBatchURL(ctx, model, user)
+
+		resp, err := h.manager.CreateBatchURL(r.Context(), req, user)
 		if err != nil {
-			render.Status(r, http.StatusInternalServerError)
-			render.JSON(w, r, err)
+			h.logger.Errorf("create batch url failed: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		if len(responseModel) == 0 {
-			render.Status(r, http.StatusOK)
+
+		if len(resp) == 0 {
+			w.WriteHeader(http.StatusOK)
 			return
 		}
-		render.Status(r, http.StatusCreated)
-		for i := range responseModel {
-			responseModel[i].ShortURL = h.cfg.BaseAddressShort + "/" + responseModel[i].ShortURL
+
+		for i := range resp {
+			resp[i].ShortURL = h.cfg.BaseAddressShort + "/" + resp[i].ShortURL
 		}
-		render.JSON(w, r, responseModel)
+		render.JSON(w, r, resp)
 	}
 }
 
 func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
 		var model api.CreateShortenReq
 		err := json.NewDecoder(r.Body).Decode(&model)
 		if err != nil {
@@ -78,19 +76,25 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 			render.JSON(w, r, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.logger.Errorf("failed to get user from context: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		responseModel, err := h.manager.CreateShortURL(ctx, model.URL, user)
+		responseModel, err := h.manager.CreateShortURL(r.Context(), model.URL, user)
 		if err != nil && !errors.Is(err, appErrors.ErrAlreadyExists) {
-			render.Status(r, http.StatusInternalServerError)
-			render.JSON(w, r, err)
+			h.logger.Errorf("failed to create short url: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		responseModel.Result = h.cfg.BaseAddressShort + "/" + responseModel.Result
+		joined, err := url.JoinPath(h.cfg.BaseAddressShort, responseModel.Result)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			h.logger.Errorf("failed to join short url: %v", err)
+			return
+		}
+		responseModel.Result = joined
 		if err != nil && errors.Is(err, appErrors.ErrAlreadyExists) {
 			render.Status(r, http.StatusConflict)
 		} else {
@@ -102,23 +106,22 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 
 func (h *Handler) NewCreateHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			render.Status(r, http.StatusBadRequest)
-			render.PlainText(w, r, http.StatusText(http.StatusBadRequest))
+			render.PlainText(w, r, err.Error())
 			return
 		}
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.logger.Errorf("failed to get user from context: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		su, createErr := h.manager.CreateShortURL(ctx, string(body), user)
+		su, createErr := h.manager.CreateShortURL(r.Context(), string(body), user)
 		if createErr != nil && !errors.Is(createErr, appErrors.ErrAlreadyExists) {
-			render.Status(r, http.StatusInternalServerError)
-			render.PlainText(w, r, http.StatusText(http.StatusInternalServerError))
+			h.logger.Errorf("failed to create short url: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
@@ -127,16 +130,19 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 		} else {
 			render.Status(r, http.StatusCreated)
 		}
-
-		render.PlainText(w, r, h.cfg.BaseAddressShort+"/"+su.Result)
+		joined, err := url.JoinPath(h.cfg.BaseAddressShort, su.Result)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			h.logger.Errorf("failed to join short url: %v", err)
+			return
+		}
+		render.PlainText(w, r, joined)
 	}
 }
 
 func (h *Handler) NewGetterHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
-		s, err := h.manager.GetURL(ctx, r.PathValue("id"))
+		s, err := h.manager.GetURL(r.Context(), r.PathValue("id"))
 		if err != nil {
 			if errors.Is(err, appErrors.ErrNotFound) {
 				w.WriteHeader(http.StatusNoContent)
@@ -146,7 +152,8 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 				w.WriteHeader(http.StatusGone)
 				return
 			}
-			w.WriteHeader(http.StatusBadRequest)
+			render.Status(r, http.StatusBadRequest)
+			render.PlainText(w, r, err.Error())
 			return
 		}
 		w.Header().Add("Location", s.OriginalURL)
@@ -156,11 +163,10 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 
 func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*10)
-		defer cancel()
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.logger.Errorf("failed to get user from context: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		var model []string
@@ -170,9 +176,10 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 			render.JSON(w, r, err)
 			return
 		}
-		err = h.manager.DeleteBatch(ctx, model, user)
+		err = h.manager.DeleteBatch(r.Context(), model, user)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
+			h.logger.Errorf("failed to delete short urls: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
@@ -182,25 +189,30 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 
 func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), time.Second*1330)
-		defer cancel()
 		user, err := h.authService.GetUserFromContext(r.Context())
 		if err != nil {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			h.logger.Errorf("failed to get user from context: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		urls, err := h.manager.GetBatchURLByUserID(ctx, user)
+		urls, err := h.manager.GetBatchURLByUserID(r.Context(), user)
 		if err != nil {
 			if errors.Is(err, appErrors.ErrNotFound) {
 				render.Status(r, http.StatusNoContent)
-				render.JSON(w, r, err)
 				return
 			}
-			render.Status(r, http.StatusInternalServerError)
+			h.logger.Errorf("failed to get short urls: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		for i, url := range urls {
-			urls[i].ShortURL = h.cfg.BaseAddressShort + "/" + url.ShortURL
+		for i, u := range urls {
+			joined, err := url.JoinPath(h.cfg.BaseAddressShort, u.ShortURL)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				h.logger.Errorf("failed to join short url: %v", err)
+				return
+			}
+			urls[i].ShortURL = joined
 		}
 		render.JSON(w, r, urls)
 	}

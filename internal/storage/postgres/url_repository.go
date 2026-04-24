@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/Luclpor/url_shortener.git/internal/logger"
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
 	"github.com/Luclpor/url_shortener.git/internal/service"
@@ -106,9 +105,6 @@ func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, u
 		FROM url_shortener
 		WHERE original_url = $1 AND user_id = $2 AND is_deleted = false
 	`
-	logger.SugarLogger.Infow("user",
-		"user_id", userId.String(),
-	)
 	var u model.ShortenURL
 	err := r.pool.QueryRow(ctx, query, longURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID, &u.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -126,9 +122,6 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL s
 		VALUES ($1, $2, $3)
 		RETURNING short_url, original_url, user_id
 	`
-	logger.SugarLogger.Infow("user",
-		"user_id", userId.String(),
-	)
 	existModel, err := r.FindByOriginalURL(ctx, originalURL, userId)
 	if existModel != nil && err == nil {
 		return existModel, appErrors.ErrAlreadyExists
