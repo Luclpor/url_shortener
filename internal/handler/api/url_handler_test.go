@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
+	"github.com/Luclpor/url_shortener.git/internal/logger"
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	modelapi "github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
@@ -122,8 +123,9 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 
 				tt.want.response = cfg.BaseAddressShort + "/"
 			}
-			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user})
+			appLog, _ := logger.InitLogger(config.ProdEnv)
+			manager := service.NewURLManager(mockRep, appLog)
+			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user}, appLog)
 			createHandler := handler.NewCreateShortenUlrJSONHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(tt.body))
@@ -235,9 +237,9 @@ func TestCreatedShortURL(t *testing.T) {
 
 				tt.want.response = cfg.BaseAddressShort + "/"
 			}
-
-			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user})
+			appLog, _ := logger.InitLogger(config.ProdEnv)
+			manager := service.NewURLManager(mockRep, appLog)
+			handler := NewHandler(cfg, nil, manager, testUserAuth{user: user}, appLog)
 			createHandler := handler.NewCreateHandler()
 
 			req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.body))
@@ -329,8 +331,9 @@ func TestGetShortURL(t *testing.T) {
 					Return(nil, false)
 			}
 
-			manager := service.NewURLManager(mockRep)
-			handler := NewHandler(nil, nil, manager, nil)
+			appLog, _ := logger.InitLogger(config.ProdEnv)
+			manager := service.NewURLManager(mockRep, appLog)
+			handler := NewHandler(nil, nil, manager, nil, appLog)
 			getHandler := handler.NewGetterHandler()
 
 			mux := http.NewServeMux()

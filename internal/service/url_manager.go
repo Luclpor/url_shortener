@@ -11,6 +11,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 //go:generate mockgen -source=url_manager.go -destination=../storage/mock/mock_user_repository.go -package=mock
@@ -26,14 +27,16 @@ type URLRepository interface {
 }
 
 type URLManager struct {
-	repo    URLRepository
-	msgChan chan dto.URLDto
+	repo      URLRepository
+	msgChan   chan dto.URLDto
+	appLogger *zap.Logger
 }
 
-func NewURLManager(repo URLRepository) *URLManager {
+func NewURLManager(repo URLRepository, appLogger *zap.Logger) *URLManager {
 	um := &URLManager{
-		repo:    repo,
-		msgChan: make(chan dto.URLDto, 100),
+		repo:      repo,
+		msgChan:   make(chan dto.URLDto, 100),
+		appLogger: appLogger,
 	}
 
 	go um.flushMessages()
@@ -45,7 +48,8 @@ func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string, use
 	var resultAPIModel *api.ShortenResp
 	key, b := m.getUniqueKey(ctx, originalURL, 0, user.ID)
 	if !b {
-		return nil, fmt.Errorf("short url already exists")
+		m.appLogger.Error("failed get unique key", zap.String("originalURL", originalURL))
+		return nil, errors.New("failed create shorten url")
 	}
 	url, err := m.repo.Save(ctx, key, originalURL, user.ID)
 	if url != nil {

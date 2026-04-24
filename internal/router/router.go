@@ -15,11 +15,11 @@ import (
 
 func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService, userAuth storage.UserAuthentication, appLogger *zap.Logger) (*chi.Mux, error) {
 	r := chi.NewRouter()
-	handler := api.NewHandler(cfg, healthService, manager, userAuth)
+	handler := api.NewHandler(cfg, healthService, manager, userAuth, appLogger)
 	r.Use(middleware.RequestID)
 	r.Use(customMidlleware.RequestLogger(appLogger))
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(15 * time.Second))
+	r.Use(middleware.Timeout(777 * time.Second))
 	r.Use(customMidlleware.CompressMiddleware)
 	r.Get("/ping", handler.NewPingHandler())
 

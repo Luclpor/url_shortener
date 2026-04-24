@@ -87,7 +87,7 @@ func NewServer() (*Server, error) {
 		closers = append(closers, memRepo.Close)
 	}
 	healthService := service.NewHealthService(healthChecker)
-	manager := service.NewURLManager(repo)
+	manager := service.NewURLManager(repo, appLogger)
 	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, appLogger)
 	if err != nil {
 		appLogger.Error("Could not initialize router", zap.Error(err))
