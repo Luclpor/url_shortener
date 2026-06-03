@@ -7,16 +7,19 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/model"
 	"github.com/Luclpor/url_shortener.git/internal/model/dto"
 	"github.com/Luclpor/url_shortener.git/pkg/errors"
+	"github.com/google/uuid"
 )
 
 type InMemoryDB struct {
 	mu          sync.Mutex
 	urls        []model.ShortenURL
+	users       []model.User
 	fileStorage *FileStorage
 }
 
 func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 	urls := make([]model.ShortenURL, 0)
+	users := make([]model.User, 0)
 	err := fStorage.ScantTo(urls)
 	if err != nil {
 		return nil, err
@@ -24,8 +27,42 @@ func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 
 	return &InMemoryDB{
 		urls:        urls,
+		users:       users,
 		fileStorage: fStorage,
 	}, nil
+}
+
+func (db *InMemoryDB) FindByShortURLsAndUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	foundURLs := make([]model.ShortenURL, 0)
+	shortenURLsMap := make(map[string]struct{})
+	for _, shortURL := range shortURLs {
+		shortenURLsMap[shortURL] = struct{}{}
+	}
+
+	for _, u := range db.urls {
+		if u.UserID != userID {
+			continue
+		}
+		if _, ok := shortenURLsMap[u.ShortURL]; !ok {
+			foundURLs = append(foundURLs, u)
+		}
+	}
+
+	return foundURLs, nil
+}
+
+func (db *InMemoryDB) FindAllByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	urls := make([]model.ShortenURL, 0)
+	for i := range db.urls {
+		if db.urls[i].UserID == userID {
+			urls = append(urls, db.urls[i])
+		}
+	}
+	return urls, nil
 }
 
 func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
@@ -40,25 +77,26 @@ func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model
 	return nil, false
 }
 
-func (db *InMemoryDB) FindByOriginalURL(_ context.Context, originalURL string) (*model.ShortenURL, error) {
+func (db *InMemoryDB) FindByOriginalURL(_ context.Context, originalURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	for i := range db.urls {
-		if db.urls[i].OriginalURL == originalURL {
+		if db.urls[i].OriginalURL == originalURL && db.urls[i].UserID == userID {
 			return &db.urls[i], errors.ErrAlreadyExists
 		}
 	}
 	return nil, nil
 }
 
-func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string) (*model.ShortenURL, error) {
+func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
 	u := model.ShortenURL{
 		ShortURL:    shortURL,
 		OriginalURL: fullURL,
+		UserID:      userID,
 	}
 
 	if err := db.fileStorage.SaveInFile(u); err != nil {
@@ -75,6 +113,7 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 	models := make([]model.ShortenURL, 0)
 	for _, v := range dtos {
 		m := model.ShortenURL{
+			UserID:        v.UserID,
 			ShortURL:      v.ShortURL,
 			OriginalURL:   v.OriginalURL,
 			CorrelationID: &v.CorrelationID,
@@ -86,6 +125,26 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 		return nil, err
 	}
 	return models, nil
+}
+
+func (db *InMemoryDB) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UUID][]string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	for userID, v := range deleteShortURLs {
+		mapURLs := make(map[string]struct{})
+		for _, u := range v {
+			mapURLs[u] = struct{}{}
+		}
+		for i, u := range db.urls {
+			if u.UserID != userID {
+				continue
+			}
+			if _, ok := mapURLs[u.ShortURL]; !ok {
+				db.urls[i].IsDeleted = true
+			}
+		}
+	}
+	return nil
 }
 
 func (db *InMemoryDB) Close() error {

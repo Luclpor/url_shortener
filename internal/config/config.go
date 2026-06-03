@@ -2,16 +2,22 @@ package config
 
 import (
 	"flag"
-	"log"
 	"time"
 
-	"github.com/caarlos0/env/v6"
+	"github.com/caarlos0/env/v11"
+)
+
+const (
+	ProdEnv   = "production"
+	SecretKey = "super_secret_key"
 )
 
 type Config struct {
+	AppEnv string `env:"APP_ENV" envDefault:"development"`
 	HTTPServer
 	BaseAddressShort string
 	FileStoragePath  string `env:"FILE_STORAGE_PATH"`
+	SecretKey        string `env:"SECRET_KEY"`
 }
 
 type HTTPServer struct {
@@ -32,7 +38,7 @@ type PostgresConfig struct {
 	HealthCheckPeriod time.Duration `env:"HEALTH_CHECK_PERIOD"`
 }
 
-func InitConfig() *Config {
+func InitConfig() (*Config, error) {
 	h := flag.String("a", "localhost:8080", "host address server")
 	b := flag.String("b", "http://localhost:8080", "base url for short url")
 	f := flag.String("f", "shortenest_url.txt", "file storage path")
@@ -60,8 +66,8 @@ func InitConfig() *Config {
 
 	err := env.Parse(&cfg)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-
-	return &cfg
+	cfg.SecretKey = SecretKey
+	return &cfg, nil
 }

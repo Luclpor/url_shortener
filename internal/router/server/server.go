@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,10 +11,13 @@ import (
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/config/db"
+	"github.com/Luclpor/url_shortener.git/internal/logger"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,24 +27,39 @@ const (
 type Server struct {
 	httpServer *http.Server
 	closers    []func() error
+	appLogger  *zap.Logger
 }
 
-func NewServer() *Server {
-	cfg := config.InitConfig()
-
+func NewServer() (*Server, error) {
+	cfg, err := config.InitConfig()
+	if err != nil {
+		return nil, err
+	}
+	appLogger, err := logger.InitLogger(cfg.AppEnv)
+	if err != nil {
+		return nil, err
+	}
 	var repo service.URLRepository
 	var healthChecker service.HealthChecker
+	var userAuth auth.UserAuthentication
 	var closers []func() error
 	if cfg.Postgres.DataBaseDSN != "" {
-		pool, err := postgres.NewPool(context.Background(), cfg.Postgres)
+		pool, err := postgres.NewPool(context.Background(), cfg.Postgres, appLogger)
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
-		repo = postgres.NewURLRepository(pool)
+		urlRepo := postgres.NewURLRepository(pool)
+		repo = urlRepo
 		healthChecker = postgres.NewHealthRepository(pool)
+		userAuth, err = auth.InitAuthService([]byte(cfg.SecretKey), urlRepo)
+		if err != nil {
+			appLogger.Error("Could not initialize auth service", zap.Error(err))
+			return nil, err
+		}
 		err = db.RunMigrations(cfg.Postgres.DataBaseDSN)
 		if err != nil {
-			log.Fatal(err)
+			appLogger.Error("Could not run migrations", zap.Error(err))
+			return nil, err
 		}
 		closers = append(closers, func() error {
 			pool.Close()
@@ -51,21 +68,29 @@ func NewServer() *Server {
 	} else {
 		fileStorage, err := inmemory.NewFileStorage(cfg.FileStoragePath)
 		if err != nil {
-			log.Fatal(err)
+			appLogger.Error("Could not initialize file storage", zap.Error(err))
+			return nil, err
 		}
 		memRepo, err := inmemory.NewRepository(fileStorage)
-		healthChecker = inmemory.NewHealthRepository()
 		if err != nil {
-			log.Fatal(err)
+			appLogger.Error("Could not initialize in memory repository", zap.Error(err))
+			return nil, err
+		}
+		healthChecker = inmemory.NewHealthRepository()
+		userAuth, err = auth.InitAuthService([]byte(cfg.SecretKey), memRepo)
+		if err != nil {
+			appLogger.Error("Could not initialize auth service", zap.Error(err))
+			return nil, err
 		}
 		repo = memRepo
 		closers = append(closers, memRepo.Close)
 	}
 	healthService := service.NewHealthService(healthChecker)
-	manager := service.NewURLManager(repo)
-	router, err := router2.NewRouter(cfg, manager, healthService)
+	manager := service.NewURLManager(repo, appLogger)
+	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, appLogger)
 	if err != nil {
-		log.Fatal(err)
+		appLogger.Error("Could not initialize router", zap.Error(err))
+		return nil, err
 	}
 
 	server := &Server{
@@ -77,36 +102,42 @@ func NewServer() *Server {
 			IdleTimeout:  cfg.IdleTimeout,
 		},
 		closers,
+		appLogger,
 	}
 
-	return server
+	return server, nil
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	defer signal.Stop(quit)
 
 	go func() {
-		log.Printf("Server listening on %s\n", s.httpServer.Addr)
+		s.appLogger.Info("Server listening on",
+			zap.String("server_address", s.httpServer.Addr),
+		)
 		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("listen: %s\n", err)
+			s.appLogger.Fatal("Error starting server", zap.Error(err))
 		}
 	}()
 
 	<-quit
-	log.Println("Shutting down server...")
+	s.appLogger.Info("Server shutting down...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	if err := s.httpServer.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		s.appLogger.Error("server forced to shutdown", zap.Error(err))
+		return err
 	}
 	for _, closeFn := range s.closers {
 		if err := closeFn(); err != nil {
-			log.Printf("close error: %v", err)
+			s.appLogger.Error("close function failed", zap.Error(err))
+			return err
 		}
 	}
-	log.Println("Server exited properly")
+	s.appLogger.Info("Server exited properly")
+	return nil
 }
