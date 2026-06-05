@@ -5,18 +5,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type publisher interface {
-	register()
-	notify(evAudit *EventAudit)
-}
-
 type observer interface {
-	updateAudit(evAudit *EventAudit, appLogger *zap.Logger)
+	updateAudit(evAudit *EventAudit) error
 }
 
 type Event struct {
 	observers []observer
-	AppLogger *zap.Logger
+	appLogger *zap.Logger
+}
+
+func NewEvent(appLogger *zap.Logger) *Event {
+	return &Event{appLogger: appLogger}
 }
 
 func (e *Event) Register(o observer) {
@@ -28,7 +27,9 @@ func (e *Event) Register(o observer) {
 
 func (e *Event) notify(evAudit *EventAudit) {
 	for _, observer := range e.observers {
-		observer.updateAudit(evAudit, e.AppLogger)
+		if err := observer.updateAudit(evAudit); err != nil && e.appLogger != nil {
+			e.appLogger.Error("Failed to send audit event", zap.Error(err))
+		}
 	}
 }
 

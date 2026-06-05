@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"sync"
-
-	"go.uber.org/zap"
 )
 
 type storageAuditor struct {
@@ -29,11 +27,8 @@ func NewStorageAuditor(path string) (observer, func() error, error) {
 	return sa, sa.Close, nil
 }
 
-func (sa *storageAuditor) updateAudit(evAudit *EventAudit, appLogger *zap.Logger) {
-	err := sa.saveAuditFS(evAudit)
-	if err != nil {
-		appLogger.Error("Failed to save audit event", zap.Error(err))
-	}
+func (sa *storageAuditor) updateAudit(evAudit *EventAudit) error {
+	return sa.saveAuditFS(evAudit)
 }
 
 func (as *storageAuditor) saveAuditFS(evAudit *EventAudit) error {

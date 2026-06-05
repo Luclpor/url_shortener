@@ -90,12 +90,14 @@ func NewServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	closers = append(closers, closer)
+	if closer != nil {
+		closers = append(closers, closer)
+	}
 	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditUrl)
 	if err != nil {
 		return nil, err
 	}
-	eventAuditPublisher := &audit.Event{AppLogger: appLogger}
+	eventAuditPublisher := audit.NewEvent(appLogger)
 	eventAuditPublisher.Register(storageAuditSbcr)
 	eventAuditPublisher.Register(extAuditSbcr)
 	healthService := service.NewHealthService(healthChecker)

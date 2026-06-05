@@ -3,9 +3,9 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/hashicorp/go-retryablehttp"
-	"go.uber.org/zap"
 
 	"net/http"
 	"net/url"
@@ -21,9 +21,12 @@ func NewRetryableHttpClient(rawURL string) (observer, error) {
 	if rawURL == "" {
 		return nil, nil
 	}
-	_, err := url.Parse(rawURL)
+	parsedURL, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
+	}
+	if parsedURL.Scheme == "" || parsedURL.Host == "" {
+		return nil, fmt.Errorf("audit url must be absolute: %q", rawURL)
 	}
 	client := retryablehttp.NewClient()
 	client.RetryMax = 5
@@ -54,11 +57,8 @@ func NewRetryableHttpClient(rawURL string) (observer, error) {
 	}, nil
 }
 
-func (ec *externalAuditClient) updateAudit(evAudit *EventAudit, appLogger *zap.Logger) {
-	err := ec.sendAuditRequest(evAudit)
-	if err != nil {
-		appLogger.Error("Failed to send audit request", zap.Error(err))
-	}
+func (ec *externalAuditClient) updateAudit(evAudit *EventAudit) error {
+	return ec.sendAuditRequest(evAudit)
 }
 
 func (ac *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
@@ -67,17 +67,17 @@ func (ac *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
 		return err
 	}
 	request, err := retryablehttp.NewRequest(http.MethodPost, ac.URL, m)
-	request.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return err
 	}
+	request.Header.Set("Content-Type", "application/json")
 	resp, err := ac.client.Do(request)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("audit receiver returned status %d", resp.StatusCode)
 	}
 	return nil
 }
