@@ -113,7 +113,7 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 		responseModel.Result = joined
 		render.JSON(w, r, responseModel)
 		h.eventPublisher.Update(&audit.EventAudit{
-			URL:       joined,
+			URL:       model.OriginalURL,
 			UserId:    user.ID,
 			Action:    "shorten",
 			Timestamp: time.Now().Unix(),
@@ -155,7 +155,7 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 		}
 		render.PlainText(w, r, joined)
 		h.eventPublisher.Update(&audit.EventAudit{
-			URL:       joined,
+			URL:       string(body),
 			UserId:    user.ID,
 			Action:    "shorten",
 			Timestamp: time.Now().Unix(),

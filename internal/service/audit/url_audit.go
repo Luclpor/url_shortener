@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/hashicorp/go-retryablehttp"
 	"go.uber.org/zap"
@@ -61,7 +62,12 @@ func (ec *externalAuditClient) updateAudit(evAudit *EventAudit, appLogger *zap.L
 }
 
 func (ac *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
-	request, err := retryablehttp.NewRequest(http.MethodGet, ac.URL, evAudit)
+	m, err := json.Marshal(evAudit)
+	if err != nil {
+		return err
+	}
+	request, err := retryablehttp.NewRequest(http.MethodPost, ac.URL, m)
+	request.Header.Set("Content-Type", "application/json")
 	if err != nil {
 		return err
 	}

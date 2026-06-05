@@ -86,10 +86,11 @@ func NewServer() (*Server, error) {
 		repo = memRepo
 		closers = append(closers, memRepo.Close)
 	}
-	storageAuditSbcr, err := audit.NewStorageAuditor(cfg.AuditFile)
+	storageAuditSbcr, closer, err := audit.NewStorageAuditor(cfg.AuditFile)
 	if err != nil {
 		return nil, err
 	}
+	closers = append(closers, closer)
 	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditUrl)
 	if err != nil {
 		return nil, err

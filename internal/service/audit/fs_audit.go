@@ -14,18 +14,19 @@ type storageAuditor struct {
 	encoder *json.Encoder
 }
 
-func NewStorageAuditor(path string) (observer, error) {
+func NewStorageAuditor(path string) (observer, func() error, error) {
 	if path == "" {
-		return nil, nil
+		return nil, nil, nil
 	}
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return &storageAuditor{
+	sa := &storageAuditor{
 		file:    file,
 		encoder: json.NewEncoder(file),
-	}, nil
+	}
+	return sa, sa.Close, nil
 }
 
 func (sa *storageAuditor) updateAudit(evAudit *EventAudit, appLogger *zap.Logger) {
@@ -43,4 +44,8 @@ func (as *storageAuditor) saveAuditFS(evAudit *EventAudit) error {
 		return err
 	}
 	return nil
+}
+
+func (as *storageAuditor) Close() error {
+	return as.file.Close()
 }
