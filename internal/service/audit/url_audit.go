@@ -17,6 +17,9 @@ type externalAuditClient struct {
 }
 
 func NewRetryableHttpClient(rawURL string) (observer, error) {
+	if rawURL == "" {
+		return nil, nil
+	}
 	_, err := url.Parse(rawURL)
 	if err != nil {
 		return nil, err
@@ -66,6 +69,7 @@ func (ac *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 
 	}

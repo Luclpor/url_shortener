@@ -116,7 +116,7 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 			URL:       joined,
 			UserId:    user.ID,
 			Action:    "shorten",
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Unix(),
 		})
 	}
 }
@@ -158,7 +158,7 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 			URL:       joined,
 			UserId:    user.ID,
 			Action:    "shorten",
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Unix(),
 		})
 	}
 }
@@ -184,7 +184,7 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 		h.eventPublisher.Update(&audit.EventAudit{
 			URL:       s.OriginalURL,
 			Action:    "follow",
-			Timestamp: time.Now(),
+			Timestamp: time.Now().Unix(),
 		})
 	}
 }

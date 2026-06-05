@@ -90,11 +90,11 @@ func NewServer() (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditFile)
+	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditUrl)
 	if err != nil {
 		return nil, err
 	}
-	eventAuditPublisher := new(audit.Event)
+	eventAuditPublisher := &audit.Event{AppLogger: appLogger}
 	eventAuditPublisher.Register(storageAuditSbcr)
 	eventAuditPublisher.Register(extAuditSbcr)
 	healthService := service.NewHealthService(healthChecker)

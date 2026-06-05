@@ -1,8 +1,6 @@
 package audit
 
 import (
-	"time"
-
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -18,16 +16,19 @@ type observer interface {
 
 type Event struct {
 	observers []observer
-	appLogger *zap.Logger
+	AppLogger *zap.Logger
 }
 
 func (e *Event) Register(o observer) {
+	if o == nil {
+		return
+	}
 	e.observers = append(e.observers, o)
 }
 
 func (e *Event) notify(evAudit *EventAudit) {
 	for _, observer := range e.observers {
-		observer.updateAudit(evAudit, e.appLogger)
+		observer.updateAudit(evAudit, e.AppLogger)
 	}
 }
 
@@ -36,7 +37,7 @@ func (e *Event) Update(evAudit *EventAudit) {
 }
 
 type EventAudit struct {
-	Timestamp time.Time `json:"ts"`
+	Timestamp int64     `json:"ts"`
 	Action    string    `json:"action"`
 	UserId    uuid.UUID `json:"user_id"`
 	URL       string    `json:"url"`
