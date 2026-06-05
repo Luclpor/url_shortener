@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -160,6 +162,63 @@ func TestCreateShortenURLJSONHandler(t *testing.T) {
 			assert.Equal(t, tt.want.response, got.Result)
 		})
 	}
+}
+
+func TestCreateShortenURLJSONHandlerWritesAuditEvent(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockRep := storageMock.NewMockURLRepository(ctrl)
+	user := &model.User{ID: uuid.New()}
+	originalURL := "https://www.practicum.com"
+	cfg := &config.Config{
+		BaseAddressShort: "http://localhost:8080",
+	}
+
+	mockRep.EXPECT().
+		FindByShortURL(gomock.Any(), gomock.Any()).
+		Return(nil, false)
+	mockRep.EXPECT().
+		Save(gomock.Any(), gomock.Any(), originalURL, user.ID).
+		DoAndReturn(func(_ any, shortURL string, fullURL string, _ any) (*model.ShortenURL, error) {
+			return &model.ShortenURL{
+				ShortURL:    shortURL,
+				OriginalURL: fullURL,
+			}, nil
+		})
+
+	appLog, _ := logger.InitLogger(config.ProdEnv)
+	auditPath := filepath.Join(t.TempDir(), "audit.log")
+	auditObserver, closeAudit, err := audit.NewStorageAuditor(auditPath)
+	require.NoError(t, err)
+	require.NotNil(t, closeAudit)
+	t.Cleanup(func() {
+		require.NoError(t, closeAudit())
+	})
+	pub := audit.NewEvent(appLog)
+	pub.Register(auditObserver)
+
+	manager := service.NewURLManager(mockRep, appLog)
+	handler := NewHandler(cfg, nil, manager, testUserAuth{user: user}, pub, appLog)
+	createHandler := handler.NewCreateShortenUlrJSONHandler()
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"`+originalURL+`"}`))
+	rec := httptest.NewRecorder()
+
+	createHandler(rec, req)
+
+	res := rec.Result()
+	defer res.Body.Close()
+	require.Equal(t, http.StatusCreated, res.StatusCode)
+
+	content, err := os.ReadFile(auditPath)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(content)), "\n")
+	require.Len(t, lines, 1)
+
+	var got audit.EventAudit
+	require.NoError(t, json.Unmarshal([]byte(lines[0]), &got))
+	assert.Equal(t, "shorten", got.Action)
+	assert.Equal(t, user.ID, got.UserId)
+	assert.Equal(t, originalURL, got.URL)
+	assert.NotZero(t, got.Timestamp)
 }
 
 func TestCreatedShortURL(t *testing.T) {
