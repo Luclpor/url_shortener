@@ -14,6 +14,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/logger"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/audit"
 	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
@@ -85,9 +86,20 @@ func NewServer() (*Server, error) {
 		repo = memRepo
 		closers = append(closers, memRepo.Close)
 	}
+	storageAuditSbcr, err := audit.NewStorageAuditor(cfg.AuditFile)
+	if err != nil {
+		return nil, err
+	}
+	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditFile)
+	if err != nil {
+		return nil, err
+	}
+	eventAuditPublisher := new(audit.Event)
+	eventAuditPublisher.Register(storageAuditSbcr)
+	eventAuditPublisher.Register(extAuditSbcr)
 	healthService := service.NewHealthService(healthChecker)
 	manager := service.NewURLManager(repo, appLogger)
-	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, appLogger)
+	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, eventAuditPublisher, appLogger)
 	if err != nil {
 		appLogger.Error("Could not initialize router", zap.Error(err))
 		return nil, err

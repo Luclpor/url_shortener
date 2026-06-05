@@ -6,10 +6,12 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/model/api"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/audit"
 	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/go-chi/render"
@@ -17,20 +19,22 @@ import (
 )
 
 type Handler struct {
-	cfg         *config.Config
-	manager     *service.URLManager
-	authService auth.UserAuthentication
-	health      *service.HealthService
-	logger      *zap.Logger
+	cfg            *config.Config
+	manager        *service.URLManager
+	authService    auth.UserAuthentication
+	health         *service.HealthService
+	logger         *zap.Logger
+	eventPublisher *audit.Event
 }
 
-func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication, appLogger *zap.Logger) *Handler {
+func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication, eventPublisher *audit.Event, appLogger *zap.Logger) *Handler {
 	return &Handler{
-		cfg:         cfg,
-		health:      health,
-		authService: userAuth,
-		manager:     manager,
-		logger:      appLogger,
+		cfg:            cfg,
+		health:         health,
+		authService:    userAuth,
+		manager:        manager,
+		logger:         appLogger,
+		eventPublisher: eventPublisher,
 	}
 }
 
@@ -108,6 +112,12 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 		}
 		responseModel.Result = joined
 		render.JSON(w, r, responseModel)
+		h.eventPublisher.Update(&audit.EventAudit{
+			URL:       joined,
+			UserId:    user.ID,
+			Action:    "shorten",
+			Timestamp: time.Now(),
+		})
 	}
 }
 
@@ -144,6 +154,12 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 			return
 		}
 		render.PlainText(w, r, joined)
+		h.eventPublisher.Update(&audit.EventAudit{
+			URL:       joined,
+			UserId:    user.ID,
+			Action:    "shorten",
+			Timestamp: time.Now(),
+		})
 	}
 }
 
@@ -165,6 +181,11 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 		}
 		w.Header().Add("Location", s.OriginalURL)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+		h.eventPublisher.Update(&audit.EventAudit{
+			URL:       s.OriginalURL,
+			Action:    "follow",
+			Timestamp: time.Now(),
+		})
 	}
 }
 
