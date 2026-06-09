@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewPool creates and validates a PostgreSQL connection pool.
 func NewPool(ctx context.Context, cfg *config.PostgresConfig, appLogger *zap.Logger) (*pgxpool.Pool, error) {
 	pgxConfig, err := pgxpool.ParseConfig(cfg.DataBaseDSN)
 	if err != nil {

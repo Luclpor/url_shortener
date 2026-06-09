@@ -10,14 +10,16 @@ import (
 	"github.com/google/uuid"
 )
 
-type InMemoryDB struct {
+// Repository stores URL and user records in memory and mirrors URL data to a file.
+type Repository struct {
 	mu          sync.Mutex
 	urls        []model.ShortenURL
 	users       []model.User
 	fileStorage *FileStorage
 }
 
-func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
+// NewRepository creates an in-memory repository backed by file storage.
+func NewRepository(fStorage *FileStorage) (*Repository, error) {
 	urls := make([]model.ShortenURL, 0)
 	users := make([]model.User, 0)
 	err := fStorage.ScantTo(urls)
@@ -25,14 +27,15 @@ func NewRepository(fStorage *FileStorage) (*InMemoryDB, error) {
 		return nil, err
 	}
 
-	return &InMemoryDB{
+	return &Repository{
 		urls:        urls,
 		users:       users,
 		fileStorage: fStorage,
 	}, nil
 }
 
-func (db *InMemoryDB) FindByShortURLsAndUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
+// FindByShortURLsAndUserID returns URL records matching the supplied short keys and user.
+func (db *Repository) FindByShortURLsAndUserID(_ context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	foundURLs := make([]model.ShortenURL, 0)
@@ -53,7 +56,8 @@ func (db *InMemoryDB) FindByShortURLsAndUserID(_ context.Context, shortURLs []st
 	return foundURLs, nil
 }
 
-func (db *InMemoryDB) FindAllByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
+// FindAllByUserID returns all URL records owned by the user.
+func (db *Repository) FindAllByUserID(_ context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	urls := make([]model.ShortenURL, 0)
@@ -65,7 +69,8 @@ func (db *InMemoryDB) FindAllByUserID(_ context.Context, userID uuid.UUID) ([]mo
 	return urls, nil
 }
 
-func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
+// FindByShortURL returns the URL record for a short key.
+func (db *Repository) FindByShortURL(_ context.Context, shortURL string) (*model.ShortenURL, bool) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -77,7 +82,8 @@ func (db *InMemoryDB) FindByShortURL(_ context.Context, shortURL string) (*model
 	return nil, false
 }
 
-func (db *InMemoryDB) FindByOriginalURL(_ context.Context, originalURL string, userID uuid.UUID) (*model.ShortenURL, error) {
+// FindByOriginalURL returns an existing URL record for an original URL and user.
+func (db *Repository) FindByOriginalURL(_ context.Context, originalURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -89,7 +95,8 @@ func (db *InMemoryDB) FindByOriginalURL(_ context.Context, originalURL string, u
 	return nil, nil
 }
 
-func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string, userID uuid.UUID) (*model.ShortenURL, error) {
+// Save stores one URL mapping and appends it to file storage.
+func (db *Repository) Save(_ context.Context, shortURL, fullURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -107,7 +114,8 @@ func (db *InMemoryDB) Save(_ context.Context, shortURL, fullURL string, userID u
 	return &u, nil
 }
 
-func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
+// SaveBatch stores several URL mappings and appends them to file storage.
+func (db *Repository) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	models := make([]model.ShortenURL, 0)
@@ -127,7 +135,8 @@ func (db *InMemoryDB) SaveBatch(_ context.Context, dtos []dto.URLDto) ([]model.S
 	return models, nil
 }
 
-func (db *InMemoryDB) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UUID][]string) error {
+// DeleteBatch marks URL records as deleted for each user.
+func (db *Repository) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UUID][]string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	for userID, v := range deleteShortURLs {
@@ -147,6 +156,7 @@ func (db *InMemoryDB) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UU
 	return nil
 }
 
-func (db *InMemoryDB) Close() error {
+// Close closes the repository file storage.
+func (db *Repository) Close() error {
 	return db.fileStorage.Close()
 }

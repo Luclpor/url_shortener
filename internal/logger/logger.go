@@ -5,6 +5,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// InitLogger creates a production or development zap logger for the given environment.
 func InitLogger(env string) (*zap.Logger, error) {
 	switch env {
 	case config.ProdEnv:

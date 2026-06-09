@@ -216,7 +216,7 @@ func TestCreateShortenURLJSONHandlerWritesAuditEvent(t *testing.T) {
 	var got audit.EventAudit
 	require.NoError(t, json.Unmarshal([]byte(lines[0]), &got))
 	assert.Equal(t, "shorten", got.Action)
-	assert.Equal(t, user.ID, got.UserId)
+	assert.Equal(t, user.ID, got.UserID)
 	assert.Equal(t, originalURL, got.URL)
 	assert.NotZero(t, got.Timestamp)
 }

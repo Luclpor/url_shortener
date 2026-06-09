@@ -18,6 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Handler groups HTTP handlers for the URL shortener API.
 type Handler struct {
 	cfg            *config.Config
 	manager        *service.URLManager
@@ -27,6 +28,7 @@ type Handler struct {
 	eventPublisher *audit.Event
 }
 
+// NewHandler creates a Handler with all service dependencies.
 func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication, eventPublisher *audit.Event, appLogger *zap.Logger) *Handler {
 	return &Handler{
 		cfg:            cfg,
@@ -38,6 +40,7 @@ func NewHandler(cfg *config.Config, health *service.HealthService, manager *serv
 	}
 }
 
+// NewCreateBatchShortenHandler returns a handler for POST /api/shorten/batch.
 func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var model []api.CreateShortenReq
@@ -78,6 +81,7 @@ func (h *Handler) NewCreateBatchShortenHandler() http.HandlerFunc {
 	}
 }
 
+// NewCreateShortenUlrJSONHandler returns a handler for POST /api/shorten.
 func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var model api.CreateShortenReq
@@ -114,13 +118,14 @@ func (h *Handler) NewCreateShortenUlrJSONHandler() http.HandlerFunc {
 		render.JSON(w, r, responseModel)
 		h.eventPublisher.Update(&audit.EventAudit{
 			URL:       model.URL,
-			UserId:    user.ID,
+			UserID:    user.ID,
 			Action:    "shorten",
 			Timestamp: time.Now().Unix(),
 		})
 	}
 }
 
+// NewCreateHandler returns a handler for POST / with a plain text URL body.
 func (h *Handler) NewCreateHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -156,13 +161,14 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 		render.PlainText(w, r, joined)
 		h.eventPublisher.Update(&audit.EventAudit{
 			URL:       string(body),
-			UserId:    user.ID,
+			UserID:    user.ID,
 			Action:    "shorten",
 			Timestamp: time.Now().Unix(),
 		})
 	}
 }
 
+// NewGetterHandler returns a handler for GET /{id} redirects.
 func (h *Handler) NewGetterHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := h.manager.GetURL(r.Context(), r.PathValue("id"))
@@ -189,6 +195,7 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 	}
 }
 
+// NewDeleteBatchHandler returns a handler for DELETE /api/user/urls.
 func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := h.authService.GetUserFromContext(r.Context())
@@ -215,6 +222,7 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 	}
 }
 
+// NewGetBatchHandler returns a handler for GET /api/user/urls.
 func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, err := h.authService.GetUserFromContext(r.Context())

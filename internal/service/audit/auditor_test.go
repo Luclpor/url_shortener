@@ -34,7 +34,7 @@ func TestEventNotifiesRegisteredObservers(t *testing.T) {
 	event := &EventAudit{
 		Timestamp: 12345678,
 		Action:    "shorten",
-		UserId:    uuid.New(),
+		UserID:    uuid.New(),
 		URL:       "https://example.com/original",
 	}
 
@@ -57,7 +57,7 @@ func TestStorageAuditorWritesJSONLine(t *testing.T) {
 	event := &EventAudit{
 		Timestamp: 12345678,
 		Action:    "follow",
-		UserId:    uuid.New(),
+		UserID:    uuid.New(),
 		URL:       "https://example.com/original",
 	}
 
@@ -91,7 +91,7 @@ func TestRetryableHTTPClientPostsAuditEvent(t *testing.T) {
 	event := &EventAudit{
 		Timestamp: 12345678,
 		Action:    "shorten",
-		UserId:    uuid.New(),
+		UserID:    uuid.New(),
 		URL:       "https://example.com/original",
 	}
 	received := make(chan EventAudit, 1)
@@ -106,7 +106,7 @@ func TestRetryableHTTPClientPostsAuditEvent(t *testing.T) {
 	}))
 	defer server.Close()
 
-	observer, err := NewRetryableHttpClient(server.URL)
+	observer, err := NewRetryableHTTPClient(server.URL)
 	require.NoError(t, err)
 	require.NotNil(t, observer)
 
@@ -115,7 +115,7 @@ func TestRetryableHTTPClientPostsAuditEvent(t *testing.T) {
 }
 
 func TestRetryableHTTPClientRejectsInvalidURL(t *testing.T) {
-	observer, err := NewRetryableHttpClient("/audit")
+	observer, err := NewRetryableHTTPClient("/audit")
 
 	require.Error(t, err)
 	assert.Nil(t, observer)
@@ -127,7 +127,7 @@ func TestRetryableHTTPClientReturnsErrorOnReceiverFailure(t *testing.T) {
 	}))
 	defer server.Close()
 
-	observer, err := NewRetryableHttpClient(server.URL)
+	observer, err := NewRetryableHTTPClient(server.URL)
 	require.NoError(t, err)
 
 	err = observer.updateAudit(&EventAudit{Action: "shorten", URL: "https://example.com"})

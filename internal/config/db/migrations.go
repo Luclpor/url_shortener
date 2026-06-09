@@ -6,10 +6,11 @@ import (
 	"log"
 
 	"github.com/golang-migrate/migrate/v4"
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres" // registers the PostgreSQL migration driver
+	_ "github.com/golang-migrate/migrate/v4/source/file"       // registers the file migration source
 )
 
+// RunMigrations applies all PostgreSQL migrations from the migrations directory.
 func RunMigrations(databaseURL string) error {
 	m, err := migrate.New(
 		"file://migrations",

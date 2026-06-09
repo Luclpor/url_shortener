@@ -12,7 +12,8 @@ type storageAuditor struct {
 	encoder *json.Encoder
 }
 
-func NewStorageAuditor(path string) (observer, func() error, error) {
+// NewStorageAuditor creates an audit observer that appends JSON events to path.
+func NewStorageAuditor(path string) (Observer, func() error, error) {
 	if path == "" {
 		return nil, nil, nil
 	}
@@ -31,16 +32,17 @@ func (sa *storageAuditor) updateAudit(evAudit *EventAudit) error {
 	return sa.saveAuditFS(evAudit)
 }
 
-func (as *storageAuditor) saveAuditFS(evAudit *EventAudit) error {
-	as.mu.Lock()
-	defer as.mu.Unlock()
-	err := as.encoder.Encode(evAudit)
+func (sa *storageAuditor) saveAuditFS(evAudit *EventAudit) error {
+	sa.mu.Lock()
+	defer sa.mu.Unlock()
+	err := sa.encoder.Encode(evAudit)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (as *storageAuditor) Close() error {
-	return as.file.Close()
+// Close closes the file used by the storage auditor.
+func (sa *storageAuditor) Close() error {
+	return sa.file.Close()
 }

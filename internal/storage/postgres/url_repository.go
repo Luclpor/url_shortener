@@ -13,14 +13,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// URLRepository stores URL and user records in PostgreSQL.
 type URLRepository struct {
 	pool *pgxpool.Pool
 }
 
+// NewURLRepository creates a PostgreSQL-backed URL repository.
 func NewURLRepository(pool *pgxpool.Pool) *URLRepository {
 	return &URLRepository{pool: pool}
 }
 
+// FindByShortURLsAndUserID returns active URL records for the specified user and short keys.
 func (r *URLRepository) FindByShortURLsAndUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, user_id
@@ -51,6 +54,7 @@ func (r *URLRepository) FindByShortURLsAndUserID(ctx context.Context, shortURLs 
 	return urls, nil
 }
 
+// FindAllByUserID returns all active URL records owned by a user.
 func (r *URLRepository) FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, user_id
@@ -80,6 +84,7 @@ func (r *URLRepository) FindAllByUserID(ctx context.Context, userID uuid.UUID) (
 	return urls, nil
 }
 
+// FindByShortURL returns a URL record by its short key.
 func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool) {
 	const query = `
 		SELECT short_url, original_url, user_id, is_deleted
@@ -99,14 +104,15 @@ func (r *URLRepository) FindByShortURL(ctx context.Context, shortURL string) (*m
 	return &u, true
 }
 
-func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, userId uuid.UUID) (*model.ShortenURL, error) {
+// FindByOriginalURL returns a user's active URL record by the original URL.
+func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	const query = `
 		SELECT short_url, original_url, correlation_id, user_id
 		FROM url_shortener
 		WHERE original_url = $1 AND user_id = $2 AND is_deleted = false
 	`
 	var u model.ShortenURL
-	err := r.pool.QueryRow(ctx, query, longURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID, &u.UserID)
+	err := r.pool.QueryRow(ctx, query, longURL, userID).Scan(&u.ShortURL, &u.OriginalURL, &u.CorrelationID, &u.UserID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, appErrors.ErrNotFound
 	}
@@ -116,13 +122,14 @@ func (r *URLRepository) FindByOriginalURL(ctx context.Context, longURL string, u
 	return &u, nil
 }
 
-func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL string, userId uuid.UUID) (*model.ShortenURL, error) {
+// Save inserts one URL mapping or returns an existing mapping for the same user.
+func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL string, userID uuid.UUID) (*model.ShortenURL, error) {
 	const query = `
 		INSERT INTO url_shortener (short_url, original_url, user_id)
 		VALUES ($1, $2, $3)
 		RETURNING short_url, original_url, user_id
 	`
-	existModel, err := r.FindByOriginalURL(ctx, originalURL, userId)
+	existModel, err := r.FindByOriginalURL(ctx, originalURL, userID)
 	if existModel != nil && err == nil {
 		return existModel, appErrors.ErrAlreadyExists
 	}
@@ -130,13 +137,14 @@ func (r *URLRepository) Save(ctx context.Context, shortURL string, originalURL s
 		return nil, err
 	}
 	var u = new(model.ShortenURL)
-	err = r.pool.QueryRow(ctx, query, shortURL, originalURL, userId).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
+	err = r.pool.QueryRow(ctx, query, shortURL, originalURL, userID).Scan(&u.ShortURL, &u.OriginalURL, &u.UserID)
 	if err != nil {
 		return nil, err
 	}
 	return u, nil
 }
 
+// SaveBatch inserts several URL mappings in one transaction.
 func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -176,6 +184,7 @@ func (r *URLRepository) SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]mod
 	return shortenURLs, nil
 }
 
+// DeleteBatch marks URL mappings as deleted for each user in one transaction.
 func (r *URLRepository) DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {

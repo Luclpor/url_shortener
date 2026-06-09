@@ -20,7 +20,7 @@ func BenchmarkEventUpdate(b *testing.B) {
 	event := &EventAudit{
 		Timestamp: 12345678,
 		Action:    "shorten",
-		UserId:    uuid.New(),
+		UserID:    uuid.New(),
 		URL:       "https://example.com/original",
 	}
 

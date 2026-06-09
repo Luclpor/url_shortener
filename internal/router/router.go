@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// NewRouter wires application middleware and URL shortener routes.
 func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *service.HealthService, userAuth auth.UserAuthentication, eventPublisher *audit.Event, appLogger *zap.Logger) (*chi.Mux, error) {
 	r := chi.NewRouter()
 	handler := api.NewHandler(cfg, healthService, manager, userAuth, eventPublisher, appLogger)

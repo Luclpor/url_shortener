@@ -25,12 +25,14 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
+// Server owns the configured HTTP server and shutdown resources.
 type Server struct {
 	httpServer *http.Server
 	closers    []func() error
 	appLogger  *zap.Logger
 }
 
+// NewServer creates a fully configured URL shortener server.
 func NewServer() (*Server, error) {
 	cfg, err := config.InitConfig()
 	if err != nil {
@@ -93,7 +95,7 @@ func NewServer() (*Server, error) {
 	if closer != nil {
 		closers = append(closers, closer)
 	}
-	extAuditSbcr, err := audit.NewRetryableHttpClient(cfg.AuditUrl)
+	extAuditSbcr, err := audit.NewRetryableHTTPClient(cfg.AuditURL)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +125,7 @@ func NewServer() (*Server, error) {
 	return server, nil
 }
 
+// Start runs the HTTP server until an interrupt or termination signal is received.
 func (s *Server) Start() error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

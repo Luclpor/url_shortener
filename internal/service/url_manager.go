@@ -18,16 +18,25 @@ import (
 
 const maxLimitMessages = 1000
 
+// URLRepository defines storage operations required by URLManager.
 type URLRepository interface {
+	// FindByShortURLsAndUserID returns active URL records for the specified user and short URL keys.
 	FindByShortURLsAndUserID(ctx context.Context, shortURLs []string, userID uuid.UUID) ([]model.ShortenURL, error)
+	// FindAllByUserID returns all active URL records owned by a user.
 	FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]model.ShortenURL, error)
+	// FindByShortURL returns a URL record by its short URL key.
 	FindByShortURL(ctx context.Context, shortURL string) (*model.ShortenURL, bool)
+	// FindByOriginalURL returns a user's URL record by the original URL.
 	FindByOriginalURL(ctx context.Context, longURL string, userID uuid.UUID) (*model.ShortenURL, error)
+	// Save stores a single URL mapping.
 	Save(ctx context.Context, shortURL string, fullURL string, userID uuid.UUID) (*model.ShortenURL, error)
+	// SaveBatch stores several URL mappings in one operation.
 	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
+	// DeleteBatch marks short URL keys as deleted for their users.
 	DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error
 }
 
+// URLManager coordinates URL shortening, lookup, listing, and asynchronous deletion.
 type URLManager struct {
 	repo             URLRepository
 	msgChan          chan dto.URLDto
@@ -35,6 +44,7 @@ type URLManager struct {
 	appLogger        *zap.Logger
 }
 
+// NewURLManager creates a URLManager and starts its background deletion flusher.
 func NewURLManager(repo URLRepository, appLogger *zap.Logger) *URLManager {
 	um := &URLManager{
 		repo:             repo,
@@ -48,6 +58,7 @@ func NewURLManager(repo URLRepository, appLogger *zap.Logger) *URLManager {
 	return um
 }
 
+// CreateShortURL creates or returns a short URL for one original URL.
 func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string, user *model.User) (*api.ShortenResp, error) {
 	var resultAPIModel *api.ShortenResp
 	key, b := m.getUniqueKey(ctx, originalURL, 0, user.ID)
@@ -66,6 +77,7 @@ func (m *URLManager) CreateShortURL(ctx context.Context, originalURL string, use
 
 }
 
+// CreateBatchURL creates short URLs for a batch shortening request.
 func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateShortenReq, user *model.User) ([]api.ShortenBatchResp, error) {
 	toAdd := make([]dto.URLDto, 0)
 	existsModels := make([]model.ShortenURL, 0)
@@ -105,6 +117,7 @@ func (m *URLManager) CreateBatchURL(ctx context.Context, apiModels []api.CreateS
 	return batchResps, nil
 }
 
+// GetURL resolves a short URL key to its stored URL record.
 func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.ShortenURL, error) {
 	url, b := m.repo.FindByShortURL(ctx, shortURL)
 	if !b || url == nil {
@@ -116,6 +129,7 @@ func (m *URLManager) GetURL(ctx context.Context, shortURL string) (*model.Shorte
 	return url, nil
 }
 
+// GetBatchURLByUserID returns all active short URLs created by a user.
 func (m *URLManager) GetBatchURLByUserID(ctx context.Context, user *model.User) ([]model.ShortenURL, error) {
 	urls, err := m.repo.FindAllByUserID(ctx, user.ID)
 	if err != nil {
@@ -136,6 +150,7 @@ func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int
 	return key, true
 }
 
+// DeleteBatch queues a user's short URLs for asynchronous deletion.
 func (m *URLManager) DeleteBatch(ctx context.Context, shortURLs []string, user *model.User) error {
 	urls, err := m.repo.FindByShortURLsAndUserID(ctx, shortURLs, user.ID)
 	if err != nil {

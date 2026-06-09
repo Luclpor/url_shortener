@@ -17,7 +17,8 @@ type externalAuditClient struct {
 	client *retryablehttp.Client
 }
 
-func NewRetryableHttpClient(rawURL string) (observer, error) {
+// NewRetryableHTTPClient creates an audit observer that posts events to rawURL.
+func NewRetryableHTTPClient(rawURL string) (Observer, error) {
 	if rawURL == "" {
 		return nil, nil
 	}
@@ -61,17 +62,17 @@ func (ec *externalAuditClient) updateAudit(evAudit *EventAudit) error {
 	return ec.sendAuditRequest(evAudit)
 }
 
-func (ac *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
+func (ec *externalAuditClient) sendAuditRequest(evAudit *EventAudit) error {
 	m, err := json.Marshal(evAudit)
 	if err != nil {
 		return err
 	}
-	request, err := retryablehttp.NewRequest(http.MethodPost, ac.URL, m)
+	request, err := retryablehttp.NewRequest(http.MethodPost, ec.URL, m)
 	if err != nil {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
-	resp, err := ac.client.Do(request)
+	resp, err := ec.client.Do(request)
 	if err != nil {
 		return err
 	}
