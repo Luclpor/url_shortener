@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// NewPingHandler returns a handler for GET /ping health checks.
 func (h *Handler) NewPingHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)

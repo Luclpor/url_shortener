@@ -2,12 +2,13 @@ package service
 
 import "math/rand"
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
+// GenerateRandomString returns a random alphabetic string with the requested length.
 func GenerateRandomString(length int) string {
-	str := make([]rune, length)
-	for i := range str {
-		str[i] = letterRunes[rand.Intn(len(letterRunes))]
+	buf := make([]byte, length)
+	for i := range buf {
+		buf[i] = letters[rand.Intn(len(letters))]
 	}
-	return string(str)
+	return string(buf)
 }

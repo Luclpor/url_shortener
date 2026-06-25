@@ -14,6 +14,7 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/logger"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
+	"github.com/Luclpor/url_shortener.git/internal/service/audit"
 	"github.com/Luclpor/url_shortener.git/internal/service/auth"
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
@@ -24,12 +25,14 @@ const (
 	shutdownTimeout = 10 * time.Second
 )
 
+// Server owns the configured HTTP server and shutdown resources.
 type Server struct {
 	httpServer *http.Server
 	closers    []func() error
 	appLogger  *zap.Logger
 }
 
+// NewServer creates a fully configured URL shortener server.
 func NewServer() (*Server, error) {
 	cfg, err := config.InitConfig()
 	if err != nil {
@@ -85,9 +88,23 @@ func NewServer() (*Server, error) {
 		repo = memRepo
 		closers = append(closers, memRepo.Close)
 	}
+	storageAuditSbcr, closer, err := audit.NewStorageAuditor(cfg.AuditFile)
+	if err != nil {
+		return nil, err
+	}
+	if closer != nil {
+		closers = append(closers, closer)
+	}
+	extAuditSbcr, err := audit.NewRetryableHTTPClient(cfg.AuditURL)
+	if err != nil {
+		return nil, err
+	}
+	eventAuditPublisher := audit.NewEvent(appLogger)
+	eventAuditPublisher.Register(storageAuditSbcr)
+	eventAuditPublisher.Register(extAuditSbcr)
 	healthService := service.NewHealthService(healthChecker)
 	manager := service.NewURLManager(repo, appLogger)
-	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, appLogger)
+	router, err := router2.NewRouter(cfg, manager, healthService, userAuth, eventAuditPublisher, appLogger)
 	if err != nil {
 		appLogger.Error("Could not initialize router", zap.Error(err))
 		return nil, err
@@ -108,6 +125,7 @@ func NewServer() (*Server, error) {
 	return server, nil
 }
 
+// Start runs the HTTP server until an interrupt or termination signal is received.
 func (s *Server) Start() error {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

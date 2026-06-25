@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Auth authenticates a request by the user_id cookie or creates a new user cookie.
 func Auth(userAuth auth.UserAuthentication, appLogger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// AddNewUser creates a new PostgreSQL user record.
 func (r *URLRepository) AddNewUser(ctx context.Context) (*model.User, error) {
 	const query = `
 		INSERT INTO service_user DEFAULT VALUES
@@ -21,6 +22,7 @@ func (r *URLRepository) AddNewUser(ctx context.Context) (*model.User, error) {
 	return u, nil
 }
 
+// GetUserByID returns a PostgreSQL user record by ID.
 func (r *URLRepository) GetUserByID(ctx context.Context, userID uuid.UUID) (*model.User, error) {
 	const query = `
 		SELECT id

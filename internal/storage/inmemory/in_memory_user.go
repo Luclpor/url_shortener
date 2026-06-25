@@ -7,7 +7,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func (db *InMemoryDB) AddNewUser(_ context.Context) (*model.User, error) {
+// AddNewUser creates and stores a new in-memory user.
+func (db *Repository) AddNewUser(_ context.Context) (*model.User, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
@@ -18,7 +19,8 @@ func (db *InMemoryDB) AddNewUser(_ context.Context) (*model.User, error) {
 	return &user, nil
 }
 
-func (db *InMemoryDB) GetUserByID(_ context.Context, id uuid.UUID) (*model.User, error) {
+// GetUserByID returns an in-memory user by ID.
+func (db *Repository) GetUserByID(_ context.Context, id uuid.UUID) (*model.User, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	for _, user := range db.users {

@@ -13,10 +13,15 @@ import (
 	"github.com/google/uuid"
 )
 
+// UserAuthentication manages user creation, cookie encryption, and request context lookup.
 type UserAuthentication interface {
+	// CreateEncryptedUser creates a new user and returns its encrypted cookie value.
 	CreateEncryptedUser() (*model.User, string, error)
+	// DecryptUser decrypts a cookie value and loads the referenced user.
 	DecryptUser(value string) (*model.User, error)
+	// GetUserFromContext extracts the authenticated user from a context.
 	GetUserFromContext(ctx context.Context) (*model.User, error)
+	// SetUserOnContext stores the authenticated user in a context.
 	SetUserOnContext(ctx context.Context, user *model.User) context.Context
 }
 
@@ -31,11 +36,13 @@ func generateRandom(size int) ([]byte, error) {
 	return b, nil
 }
 
+// UserAuth implements encrypted cookie authentication backed by a user repository.
 type UserAuth struct {
 	aesgcm   cipher.AEAD
 	userRepo storage.UserRepository
 }
 
+// InitAuthService initializes encrypted user authentication with the supplied AES key.
 func InitAuthService(key []byte, ur storage.UserRepository) (UserAuthentication, error) {
 	aesblock, err := aes.NewCipher(key)
 	if err != nil {
@@ -48,6 +55,7 @@ func InitAuthService(key []byte, ur storage.UserRepository) (UserAuthentication,
 	return &UserAuth{aesgcm, ur}, nil
 }
 
+// CreateEncryptedUser creates a user and returns an encrypted URL-safe user token.
 func (ua *UserAuth) CreateEncryptedUser() (*model.User, string, error) {
 	nonce, err := generateRandom(ua.aesgcm.NonceSize())
 	if err != nil {
@@ -67,6 +75,7 @@ func (ua *UserAuth) CreateEncryptedUser() (*model.User, string, error) {
 	return user, encryptedUserID, nil
 }
 
+// DecryptUser decrypts a user token and loads the user from storage.
 func (ua *UserAuth) DecryptUser(value string) (*model.User, error) {
 	data, err := base64.RawURLEncoding.DecodeString(value)
 	if err != nil {
