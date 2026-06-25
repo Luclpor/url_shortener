@@ -172,6 +172,12 @@ func (h *Handler) NewCreateHandler() http.HandlerFunc {
 func (h *Handler) NewGetterHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s, err := h.manager.GetURL(r.Context(), r.PathValue("id"))
+		user, err := h.authService.GetUserFromContext(r.Context())
+		if err != nil {
+			h.logger.Error("failed to get user from context:", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		if err != nil {
 			if errors.Is(err, appErrors.ErrNotFound) {
 				w.WriteHeader(http.StatusNoContent)
@@ -190,6 +196,7 @@ func (h *Handler) NewGetterHandler() http.HandlerFunc {
 		h.eventPublisher.Update(&audit.EventAudit{
 			URL:       s.OriginalURL,
 			Action:    "follow",
+			UserID:    user.ID,
 			Timestamp: time.Now().Unix(),
 		})
 	}

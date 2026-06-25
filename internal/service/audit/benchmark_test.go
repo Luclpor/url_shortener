@@ -9,7 +9,7 @@ import (
 
 type benchmarkObserver struct{}
 
-func (benchmarkObserver) updateAudit(*EventAudit) error {
+func (benchmarkObserver) UpdateAudit(*EventAudit) error {
 	return nil
 }
 

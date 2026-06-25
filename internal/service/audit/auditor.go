@@ -7,7 +7,7 @@ import (
 
 // Observer receives audit events from Event.
 type Observer interface {
-	updateAudit(evAudit *EventAudit) error
+	UpdateAudit(evAudit *EventAudit) error
 }
 
 // Event publishes audit events to registered observers.
@@ -31,7 +31,7 @@ func (e *Event) Register(o Observer) {
 
 func (e *Event) notify(evAudit *EventAudit) {
 	for _, observer := range e.observers {
-		if err := observer.updateAudit(evAudit); err != nil && e.appLogger != nil {
+		if err := observer.UpdateAudit(evAudit); err != nil && e.appLogger != nil {
 			e.appLogger.Error("Failed to send audit event", zap.Error(err))
 		}
 	}

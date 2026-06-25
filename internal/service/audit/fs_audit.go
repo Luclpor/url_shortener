@@ -28,7 +28,7 @@ func NewStorageAuditor(path string) (Observer, func() error, error) {
 	return sa, sa.Close, nil
 }
 
-func (sa *storageAuditor) updateAudit(evAudit *EventAudit) error {
+func (sa *storageAuditor) UpdateAudit(evAudit *EventAudit) error {
 	return sa.saveAuditFS(evAudit)
 }
 

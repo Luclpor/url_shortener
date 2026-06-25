@@ -58,7 +58,7 @@ func NewRetryableHTTPClient(rawURL string) (Observer, error) {
 	}, nil
 }
 
-func (ec *externalAuditClient) updateAudit(evAudit *EventAudit) error {
+func (ec *externalAuditClient) UpdateAudit(evAudit *EventAudit) error {
 	return ec.sendAuditRequest(evAudit)
 }
 

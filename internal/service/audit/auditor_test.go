@@ -21,7 +21,7 @@ type testObserver struct {
 	err    error
 }
 
-func (o *testObserver) updateAudit(evAudit *EventAudit) error {
+func (o *testObserver) UpdateAudit(evAudit *EventAudit) error {
 	o.events = append(o.events, evAudit)
 	return o.err
 }
@@ -66,7 +66,7 @@ func TestStorageAuditorWritesJSONLine(t *testing.T) {
 	require.NotNil(t, observer)
 	require.NotNil(t, closeFn)
 
-	require.NoError(t, observer.updateAudit(event))
+	require.NoError(t, observer.UpdateAudit(event))
 	require.NoError(t, closeFn())
 
 	content, err := os.ReadFile(path)
@@ -110,7 +110,7 @@ func TestRetryableHTTPClientPostsAuditEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, observer)
 
-	require.NoError(t, observer.updateAudit(event))
+	require.NoError(t, observer.UpdateAudit(event))
 	assert.Equal(t, *event, <-received)
 }
 
@@ -130,7 +130,7 @@ func TestRetryableHTTPClientReturnsErrorOnReceiverFailure(t *testing.T) {
 	observer, err := NewRetryableHTTPClient(server.URL)
 	require.NoError(t, err)
 
-	err = observer.updateAudit(&EventAudit{Action: "shorten", URL: "https://example.com"})
+	err = observer.UpdateAudit(&EventAudit{Action: "shorten", URL: "https://example.com"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "audit receiver returned status")
 }
