@@ -370,6 +370,8 @@ func TestGetShortURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			user := &model.User{ID: uuid.New()}
+
 			ctrl := gomock.NewController(t)
 			mockRep := storageMock.NewMockURLRepository(ctrl)
 
@@ -396,7 +398,7 @@ func TestGetShortURL(t *testing.T) {
 			appLog, _ := logger.InitLogger(config.ProdEnv)
 			manager := service.NewURLManager(mockRep, appLog)
 			pub := new(audit.Event)
-			handler := NewHandler(nil, nil, manager, nil, pub, appLog)
+			handler := NewHandler(nil, nil, manager, testUserAuth{user: user}, pub, appLog)
 			getHandler := handler.NewGetterHandler()
 
 			mux := http.NewServeMux()
