@@ -8,10 +8,11 @@ import (
 func main() {
 	log.Fatal("allowed")
 	os.Exit(0)
-	panic("still forbidden")
+	panic("still forbidden") // want "use of built-in panic is prohibited"
 }
 
 func helper() {
-	log.Fatal("forbidden")
-	os.Exit(1)
+	log.Fatal("forbidden") // want "log.Fatal is allowed only in function main of package main"
+	os.Exit(1)             // want "os.Exit is allowed only in function main of package main"
+
 }
