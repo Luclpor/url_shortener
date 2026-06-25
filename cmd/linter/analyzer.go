@@ -7,7 +7,7 @@ import (
 	"golang.org/x/tools/go/analysis"
 )
 
-// Analyzer reports calls that should not be used in project code.
+// Анализатор вызовов которые не должны изспользовать в проекте
 var Analyzer = &analysis.Analyzer{
 	Name: "panicexit",
 	Doc:  "reports built-in panic calls and forbidden process termination calls",
