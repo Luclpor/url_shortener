@@ -23,21 +23,21 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 func inspectFile(pass *analysis.Pass, file *ast.File) {
 	var nodeStack []ast.Node
-	var funcStack []*ast.FuncDecl
+	var funcStack []ast.Node
 
 	ast.Inspect(file, func(node ast.Node) bool {
 		if node == nil {
 			last := nodeStack[len(nodeStack)-1]
 			nodeStack = nodeStack[:len(nodeStack)-1]
-			if _, ok := last.(*ast.FuncDecl); ok {
+			if isFuncScope(last) {
 				funcStack = funcStack[:len(funcStack)-1]
 			}
 			return true
 		}
 
 		nodeStack = append(nodeStack, node)
-		if fn, ok := node.(*ast.FuncDecl); ok {
-			funcStack = append(funcStack, fn)
+		if isFuncScope(node) {
+			funcStack = append(funcStack, node)
 		}
 
 		call, ok := node.(*ast.CallExpr)
@@ -45,7 +45,7 @@ func inspectFile(pass *analysis.Pass, file *ast.File) {
 			return true
 		}
 
-		var enclosingFunc *ast.FuncDecl
+		var enclosingFunc ast.Node
 		if len(funcStack) > 0 {
 			enclosingFunc = funcStack[len(funcStack)-1]
 		}
@@ -55,7 +55,16 @@ func inspectFile(pass *analysis.Pass, file *ast.File) {
 	})
 }
 
-func checkCall(pass *analysis.Pass, call *ast.CallExpr, enclosingFunc *ast.FuncDecl) {
+func isFuncScope(node ast.Node) bool {
+	switch node.(type) {
+	case *ast.FuncDecl, *ast.FuncLit:
+		return true
+	default:
+		return false
+	}
+}
+
+func checkCall(pass *analysis.Pass, call *ast.CallExpr, enclosingFunc ast.Node) {
 	if isBuiltinPanic(pass, call) {
 		pass.Reportf(call.Pos(), "use of built-in panic is prohibited")
 		return
@@ -105,6 +114,11 @@ func processTerminator(pass *analysis.Pass, call *ast.CallExpr) (string, bool) {
 	}
 }
 
-func isMainFunc(pass *analysis.Pass, fn *ast.FuncDecl) bool {
+func isMainFunc(pass *analysis.Pass, node ast.Node) bool {
+	fn, ok := node.(*ast.FuncDecl)
+	if !ok {
+		return false
+	}
+
 	return pass.Pkg.Name() == "main" && fn != nil && fn.Recv == nil && fn.Name.Name == "main"
 }
