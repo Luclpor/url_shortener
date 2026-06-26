@@ -2,8 +2,8 @@ package main
 
 import "testing"
 
-func TestFormatBuildInfoUsesNAForEmptyValues(t *testing.T) {
-	got := formatBuildInfo("", "", "")
+func TestFormatBuildInfoUsesDefaultBuildValues(t *testing.T) {
+	got := formatBuildInfo(buildVersion, buildDate, buildCommit)
 	want := "Build version: N/A\nBuild date: N/A\nBuild commit: N/A\n"
 
 	if got != want {

@@ -9,9 +9,11 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/router/server"
 )
 
-var buildVersion string
-var buildDate string
-var buildCommit string
+var (
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
+)
 
 func main() {
 	printBuildInfo(os.Stdout)
@@ -32,15 +34,8 @@ func printBuildInfo(w io.Writer) {
 func formatBuildInfo(version, date, commit string) string {
 	return fmt.Sprintf(
 		"Build version: %s\nBuild date: %s\nBuild commit: %s\n",
-		buildInfoValue(version),
-		buildInfoValue(date),
-		buildInfoValue(commit),
+		version,
+		date,
+		commit,
 	)
-}
-
-func buildInfoValue(value string) string {
-	if value == "" {
-		return "N/A"
-	}
-	return value
 }
