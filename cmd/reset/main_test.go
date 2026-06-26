@@ -114,6 +114,17 @@ func TestGeneratedResetBehavior(t *testing.T) {
 	}
 }
 `)
+	testdataDir := filepath.Join(pkgDir, "testdata")
+	if err := os.MkdirAll(testdataDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(testdataDir, "fixture.go"), `package testdata
+
+// generate:reset
+type Fixture struct {
+	Value int
+}
+`)
 
 	if err := run(root); err != nil {
 		t.Fatal(err)
@@ -128,6 +139,9 @@ func TestGeneratedResetBehavior(t *testing.T) {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated file does not contain %q:\n%s", want, text)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(testdataDir, generatedFileName)); !os.IsNotExist(err) {
+		t.Fatalf("testdata generated file exists, err=%v", err)
 	}
 
 	cmd := exec.Command("go", "test", "./...")

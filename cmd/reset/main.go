@@ -107,7 +107,7 @@ func shouldSkipDir(root, path, name string) bool {
 	if path == root {
 		return false
 	}
-	if name == "vendor" || name == "node_modules" {
+	if name == "vendor" || name == "node_modules" || name == "testdata" {
 		return true
 	}
 	return strings.HasPrefix(name, ".")
