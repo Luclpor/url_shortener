@@ -225,7 +225,7 @@ func newExampleHandler(repo *exampleURLRepository) http.Handler {
 	handler, err := router.NewRouter(cfg, manager, healthService, exampleAuth{user: repo.user}, eventPublisher, appLogger)
 	if err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		})
 	}
 	return handler
