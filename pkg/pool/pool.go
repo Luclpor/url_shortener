@@ -1,6 +1,12 @@
 package pool
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
+
+// ErrNilConstructor is returned when New receives a nil constructor.
+var ErrNilConstructor = errors.New("pool constructor is nil")
 
 // Resetter describes values that can clear their internal state.
 type Resetter interface {
@@ -12,17 +18,17 @@ type Pool[T Resetter] struct {
 	pool sync.Pool
 }
 
-// New creates a pool.
-//
-// If newFn is provided, it is used to allocate objects when the pool is empty.
-func New[T Resetter](newFn ...func() T) *Pool[T] {
-	p := &Pool[T]{}
-	if len(newFn) > 0 && newFn[0] != nil {
-		p.pool.New = func() any {
-			return newFn[0]()
-		}
+// New creates a pool that uses newFn to allocate objects when the pool is empty.
+func New[T Resetter](newFn func() T) (*Pool[T], error) {
+	if newFn == nil {
+		return nil, ErrNilConstructor
 	}
-	return p
+
+	p := &Pool[T]{}
+	p.pool.New = func() any {
+		return newFn()
+	}
+	return p, nil
 }
 
 // Get returns an object from the pool.

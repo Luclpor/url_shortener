@@ -1,6 +1,9 @@
 package pool
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 type resettableBuffer struct {
 	values     []int
@@ -14,10 +17,13 @@ func (b *resettableBuffer) Reset() {
 
 func TestPoolGetUsesConstructor(t *testing.T) {
 	created := 0
-	p := New(func() *resettableBuffer {
+	p, err := New(func() *resettableBuffer {
 		created++
 		return &resettableBuffer{values: make([]int, 0, 4)}
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	got := p.Get()
 
@@ -33,9 +39,12 @@ func TestPoolGetUsesConstructor(t *testing.T) {
 }
 
 func TestPoolPutResetsObject(t *testing.T) {
-	p := New(func() *resettableBuffer {
+	p, err := New(func() *resettableBuffer {
 		return &resettableBuffer{values: make([]int, 0, 8)}
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	buf := p.Get()
 	buf.values = append(buf.values, 1, 2, 3)
 
@@ -52,8 +61,13 @@ func TestPoolPutResetsObject(t *testing.T) {
 	}
 }
 
-func TestPoolWorksWithoutConstructor(t *testing.T) {
-	p := New[*resettableBuffer]()
+func TestPoolReusesStoredObject(t *testing.T) {
+	p, err := New(func() *resettableBuffer {
+		return &resettableBuffer{}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	buf := &resettableBuffer{values: []int{1, 2, 3}}
 
 	p.Put(buf)
@@ -64,5 +78,16 @@ func TestPoolWorksWithoutConstructor(t *testing.T) {
 	}
 	if len(got.values) != 0 {
 		t.Fatalf("stored object was not reset: %v", got.values)
+	}
+}
+
+func TestNewRejectsNilConstructor(t *testing.T) {
+	p, err := New[*resettableBuffer](nil)
+
+	if p != nil {
+		t.Fatalf("New returned pool for nil constructor: %#v", p)
+	}
+	if !errors.Is(err, ErrNilConstructor) {
+		t.Fatalf("New error = %v, want %v", err, ErrNilConstructor)
 	}
 }
