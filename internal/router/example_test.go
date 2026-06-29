@@ -224,7 +224,9 @@ func newExampleHandler(repo *exampleURLRepository) http.Handler {
 	eventPublisher := audit.NewEvent(appLogger)
 	handler, err := router.NewRouter(cfg, manager, healthService, exampleAuth{user: repo.user}, eventPublisher, appLogger)
 	if err != nil {
-		panic(err)
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		})
 	}
 	return handler
 }

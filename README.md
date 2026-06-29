@@ -8,6 +8,19 @@
 git fetch template && git checkout template/v2 .github
 ```
 
+## Сборка с информацией о версии
+
+При обычной сборке приложение выводит `N/A` для версии, даты и коммита. Чтобы записать эти значения в бинарник на этапе компиляции, используйте `-ldflags`:
+
+```bash
+go build \
+  -ldflags "\
+    -X 'main.buildVersion=v1.0.0' \
+    -X 'main.buildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)' \
+    -X 'main.buildCommit=$(git rev-parse --short HEAD)'" \
+  -o bin/shortener ./cmd/shortener
+```
+
 ## Бенчмарки и профилирование памяти
 
 Бенчмарки запускаются с 30-секундной нагрузкой:
