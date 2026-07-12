@@ -1,13 +1,11 @@
 package config
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/caarlos0/env/v11"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -35,37 +33,57 @@ const (
 	SecretKey = "super_secret_key"
 )
 
+const (
+	keyAppEnv            = "app_env"
+	keyServerAddress     = "server_address"
+	keyBaseURL           = "base_url"
+	keyFileStoragePath   = "file_storage_path"
+	keyStorageType       = "storage_type"
+	keyAuditFile         = "audit_file"
+	keyAuditURL          = "audit_url"
+	keyEnableHTTPS       = "enable_https"
+	keyTLSCertFile       = "tls_cert_file"
+	keyTLSKeyFile        = "tls_key_file"
+	keyConfigFilePath    = "config"
+	keyDatabaseDSN       = "database_dsn"
+	keyMaxConns          = "max_conns"
+	keyMinConns          = "min_conns"
+	keyMaxConnLifetime   = "max_conn_lifetime"
+	keyMaxConnIdleTime   = "max_conn_idle_time"
+	keyHealthCheckPeriod = "health_check_period"
+)
+
 // Config contains application settings loaded from flags and environment variables.
 type Config struct {
 	// AppEnv selects application mode, including logger configuration.
-	AppEnv string `env:"APP_ENV" envDefault:"development"`
+	AppEnv string
 	HTTPServer
 	// BaseAddressShort is the public base URL used to build shortened links.
-	BaseAddressShort string `env:"BASE_URL"`
+	BaseAddressShort string
 	// FileStoragePath points to the JSONL file used by the in-memory repository.
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	FileStoragePath string
 	// SecretKey is the AES key used by the authentication service.
-	SecretKey string `env:"SECRET_KEY"`
+	SecretKey string
 }
 
 // HTTPServer contains HTTP, storage, and audit settings for the service.
 type HTTPServer struct {
 	// ServerAddress is the bind address of the HTTP server.
-	ServerAddress string `env:"SERVER_ADDRESS"`
+	ServerAddress string
 	// BaseURL duplicates BaseAddressShort for callers that read HTTP server settings directly.
-	BaseURL string `env:"-"`
+	BaseURL string
 	// StorageType names the configured storage backend.
-	StorageType string `env:"STORAGE_TYPE"`
+	StorageType string
 	// AuditFile enables file-based audit logging when it is not empty.
-	AuditFile string `env:"AUDIT_FILE"`
+	AuditFile string
 	// AuditURL enables HTTP audit delivery when it is not empty.
-	AuditURL string `env:"AUDIT_URL"`
+	AuditURL string
 	// EnableHTTPS switches the web server to TLS.
-	EnableHTTPS bool `env:"ENABLE_HTTPS"`
+	EnableHTTPS bool
 	// TLSCertFile is a path to the TLS public certificate file.
-	TLSCertFile string `env:"TLS_CERT_FILE"`
+	TLSCertFile string
 	// TLSKeyFile is a path to the TLS private key file.
-	TLSKeyFile string `env:"TLS_KEY_FILE"`
+	TLSKeyFile string
 	// Postgres holds PostgreSQL connection pool settings.
 	Postgres *PostgresConfig
 	// Timeout is applied to HTTP read and write operations.
@@ -77,206 +95,209 @@ type HTTPServer struct {
 // PostgresConfig contains PostgreSQL DSN and connection pool settings.
 type PostgresConfig struct {
 	// DataBaseDSN is the PostgreSQL connection string.
-	DataBaseDSN string `env:"DATABASE_DSN"`
+	DataBaseDSN string
 	// MaxConns limits the maximum number of PostgreSQL connections.
-	MaxConns int32 `env:"MAX_CONNS"`
+	MaxConns int32
 	// MinConns keeps a minimum number of PostgreSQL connections ready.
-	MinConns int32 `env:"MIN_CONNS"`
+	MinConns int32
 	// MaxConnLifetime limits how long a PostgreSQL connection can be reused.
-	MaxConnLifetime time.Duration `env:"MAX_CONN_LIFETIME"`
+	MaxConnLifetime time.Duration
 	// MaxConnIdleTime limits how long an idle PostgreSQL connection is kept.
-	MaxConnIdleTime time.Duration `env:"MAX_CONN_IDLE_TIME"`
+	MaxConnIdleTime time.Duration
 	// HealthCheckPeriod controls how often the PostgreSQL pool checks idle connections.
-	HealthCheckPeriod time.Duration `env:"HEALTH_CHECK_PERIOD"`
+	HealthCheckPeriod time.Duration
 }
 
-type cliConfig struct {
-	serverAddress    string
-	baseAddressShort string
-	fileStoragePath  string
-	databaseDSN      string
-	auditFile        string
-	auditURL         string
-	configFilePath   string
-	enableHTTPS      bool
-	tlsCertFile      string
-	tlsKeyFile       string
+type stdFlagValue struct {
+	flag      *flag.Flag
+	flagSet   *flag.FlagSet
+	valueType string
+	key       string
 }
 
-type fileConfig struct {
-	ServerAddress   *string `json:"server_address"`
-	BaseURL         *string `json:"base_url"`
-	FileStoragePath *string `json:"file_storage_path"`
-	DatabaseDSN     *string `json:"database_dsn"`
-	EnableHTTPS     *bool   `json:"enable_https"`
-	TLSCertFile     *string `json:"tls_cert_file"`
-	TLSKeyFile      *string `json:"tls_key_file"`
-	AuditFile       *string `json:"audit_file"`
-	AuditURL        *string `json:"audit_url"`
+func (v stdFlagValue) HasChanged() bool {
+	changed := false
+	v.flagSet.Visit(func(f *flag.Flag) {
+		if f.Name == v.flag.Name {
+			changed = true
+		}
+	})
+	return changed
+}
+
+func (v stdFlagValue) Name() string {
+	return v.key
+}
+
+func (v stdFlagValue) ValueString() string {
+	return v.flag.Value.String()
+}
+
+func (v stdFlagValue) ValueType() string {
+	return v.valueType
 }
 
 // InitConfig parses flags and environment variables into Config.
 func InitConfig() (*Config, error) {
-	cli := cliConfig{
-		serverAddress:    defaultServerAddress,
-		baseAddressShort: defaultBaseURL,
-		fileStoragePath:  defaultFileStoragePath,
-		databaseDSN:      defaultDatabaseDSN,
-		auditFile:        defaultAuditFile,
-		auditURL:         defaultAuditURL,
-		configFilePath:   configFilePathFromEnv(),
-		enableHTTPS:      defaultHTTPS,
-		tlsCertFile:      defaultTLSCertFile,
-		tlsKeyFile:       defaultTLSKeyFile,
-	}
+	flagSet := flag.CommandLine
 
-	flag.StringVar(&cli.serverAddress, "a", cli.serverAddress, "host address server")
-	flag.StringVar(&cli.baseAddressShort, "b", cli.baseAddressShort, "base url for short url")
-	flag.StringVar(&cli.fileStoragePath, "f", cli.fileStoragePath, "file storage path")
-	flag.StringVar(&cli.databaseDSN, "d", cli.databaseDSN, "dsn connection to db")
-	flag.StringVar(&cli.auditFile, "audit-file", cli.auditFile, "file audit storage path")
-	flag.StringVar(&cli.auditURL, "audit-url", cli.auditURL, "audit url")
-	flag.StringVar(&cli.configFilePath, "c", cli.configFilePath, "json config file path")
-	flag.StringVar(&cli.configFilePath, "config", cli.configFilePath, "json config file path")
-	flag.BoolVar(&cli.enableHTTPS, "s", cli.enableHTTPS, "enable HTTPS")
-	flag.StringVar(&cli.tlsCertFile, "tls-cert-file", cli.tlsCertFile, "TLS public certificate file path")
-	flag.StringVar(&cli.tlsKeyFile, "tls-key-file", cli.tlsKeyFile, "TLS private key file path")
+	flagSet.String("a", defaultServerAddress, "host address server")
+	flagSet.String("b", defaultBaseURL, "base url for short url")
+	flagSet.String("f", defaultFileStoragePath, "file storage path")
+	flagSet.String("d", defaultDatabaseDSN, "dsn connection to db")
+	flagSet.String("audit-file", defaultAuditFile, "file audit storage path")
+	flagSet.String("audit-url", defaultAuditURL, "audit url")
+	configFilePathShort := flagSet.String("c", defaultConfigFilePath, "json config file path")
+	configFilePathLong := flagSet.String("config", defaultConfigFilePath, "json config file path")
+	flagSet.Bool("s", defaultHTTPS, "enable HTTPS")
+	flagSet.String("tls-cert-file", defaultTLSCertFile, "TLS public certificate file path")
+	flagSet.String("tls-key-file", defaultTLSKeyFile, "TLS private key file path")
 
 	flag.Parse()
 
-	cfg := newDefaultConfig()
-	if cli.configFilePath != defaultConfigFilePath {
-		if err := loadConfigFile(&cfg, cli.configFilePath); err != nil {
+	v := viper.New()
+	setDefaults(v)
+	bindEnv(v)
+	if err := bindFlags(v, flagSet); err != nil {
+		return nil, err
+	}
+
+	configFilePath := configFilePath(v, flagSet, *configFilePathShort, *configFilePathLong)
+	if configFilePath != defaultConfigFilePath {
+		v.SetConfigFile(configFilePath)
+		if err := v.ReadInConfig(); err != nil {
 			return nil, err
 		}
 	}
 
-	flags := parsedFlags()
-	applyFlags(&cfg, cli, flags)
-
-	if err := env.Parse(&cfg); err != nil {
-		return nil, err
-	}
-	if flags["s"] && cli.enableHTTPS {
-		cfg.EnableHTTPS = true
-	}
-	cfg.BaseURL = cfg.BaseAddressShort
-	cfg.SecretKey = SecretKey
-	return &cfg, nil
+	return buildConfig(v), nil
 }
 
-func newDefaultConfig() Config {
-	return Config{
-		HTTPServer: HTTPServer{
-			ServerAddress: defaultServerAddress,
-			BaseURL:       defaultBaseURL,
-			Timeout:       defaultTimeout,
-			IdleTimeout:   defaultIdleTimeout,
-			AuditFile:     defaultAuditFile,
-			AuditURL:      defaultAuditURL,
-			EnableHTTPS:   defaultHTTPS,
-			TLSCertFile:   defaultTLSCertFile,
-			TLSKeyFile:    defaultTLSKeyFile,
-			Postgres: &PostgresConfig{
-				DataBaseDSN:       defaultDatabaseDSN,
-				MaxConns:          defaultMaxConns,
-				MinConns:          defaultMinConns,
-				MaxConnLifetime:   defaultMaxConnLifetime,
-				MaxConnIdleTime:   defaultMaxConnIdleTime,
-				HealthCheckPeriod: defaultHealthCheckDelay,
-			},
-		},
-		BaseAddressShort: defaultBaseURL,
-		FileStoragePath:  defaultFileStoragePath,
-	}
+func setDefaults(v *viper.Viper) {
+	v.SetDefault(keyAppEnv, "development")
+	v.SetDefault(keyServerAddress, defaultServerAddress)
+	v.SetDefault(keyBaseURL, defaultBaseURL)
+	v.SetDefault(keyFileStoragePath, defaultFileStoragePath)
+	v.SetDefault(keyStorageType, "")
+	v.SetDefault(keyAuditFile, defaultAuditFile)
+	v.SetDefault(keyAuditURL, defaultAuditURL)
+	v.SetDefault(keyEnableHTTPS, defaultHTTPS)
+	v.SetDefault(keyTLSCertFile, defaultTLSCertFile)
+	v.SetDefault(keyTLSKeyFile, defaultTLSKeyFile)
+	v.SetDefault(keyConfigFilePath, defaultConfigFilePath)
+	v.SetDefault(keyDatabaseDSN, defaultDatabaseDSN)
+	v.SetDefault(keyMaxConns, defaultMaxConns)
+	v.SetDefault(keyMinConns, defaultMinConns)
+	v.SetDefault(keyMaxConnLifetime, defaultMaxConnLifetime)
+	v.SetDefault(keyMaxConnIdleTime, defaultMaxConnIdleTime)
+	v.SetDefault(keyHealthCheckPeriod, defaultHealthCheckDelay)
 }
 
-func configFilePathFromEnv() string {
-	if configFilePath, ok := os.LookupEnv("CONFIG"); ok {
-		return configFilePath
+func bindEnv(v *viper.Viper) {
+	envBindings := map[string]string{
+		keyAppEnv:            "APP_ENV",
+		keyServerAddress:     "SERVER_ADDRESS",
+		keyBaseURL:           "BASE_URL",
+		keyFileStoragePath:   "FILE_STORAGE_PATH",
+		keyStorageType:       "STORAGE_TYPE",
+		keyAuditFile:         "AUDIT_FILE",
+		keyAuditURL:          "AUDIT_URL",
+		keyEnableHTTPS:       "ENABLE_HTTPS",
+		keyTLSCertFile:       "TLS_CERT_FILE",
+		keyTLSKeyFile:        "TLS_KEY_FILE",
+		keyConfigFilePath:    "CONFIG",
+		keyDatabaseDSN:       "DATABASE_DSN",
+		keyMaxConns:          "MAX_CONNS",
+		keyMinConns:          "MIN_CONNS",
+		keyMaxConnLifetime:   "MAX_CONN_LIFETIME",
+		keyMaxConnIdleTime:   "MAX_CONN_IDLE_TIME",
+		keyHealthCheckPeriod: "HEALTH_CHECK_PERIOD",
 	}
-	return defaultConfigFilePath
-}
-
-func parsedFlags() map[string]bool {
-	flags := make(map[string]bool)
-	flag.Visit(func(f *flag.Flag) {
-		flags[f.Name] = true
-	})
-	return flags
-}
-
-func applyFlags(cfg *Config, cli cliConfig, flags map[string]bool) {
-	if flags["a"] {
-		cfg.ServerAddress = cli.serverAddress
-	}
-	if flags["b"] {
-		cfg.BaseAddressShort = cli.baseAddressShort
-		cfg.BaseURL = cli.baseAddressShort
-	}
-	if flags["f"] {
-		cfg.FileStoragePath = cli.fileStoragePath
-	}
-	if flags["d"] {
-		cfg.Postgres.DataBaseDSN = cli.databaseDSN
-	}
-	if flags["audit-file"] {
-		cfg.AuditFile = cli.auditFile
-	}
-	if flags["audit-url"] {
-		cfg.AuditURL = cli.auditURL
-	}
-	if flags["s"] {
-		cfg.EnableHTTPS = cli.enableHTTPS
-	}
-	if flags["tls-cert-file"] {
-		cfg.TLSCertFile = cli.tlsCertFile
-	}
-	if flags["tls-key-file"] {
-		cfg.TLSKeyFile = cli.tlsKeyFile
+	for key, envName := range envBindings {
+		_ = v.BindEnv(key, envName)
 	}
 }
 
-func loadConfigFile(cfg *Config, configFilePath string) error {
-	content, err := os.ReadFile(configFilePath)
-	if err != nil {
-		return fmt.Errorf("read config file: %w", err)
+func bindFlags(v *viper.Viper, flagSet *flag.FlagSet) error {
+	flagBindings := []struct {
+		flagName  string
+		key       string
+		valueType string
+	}{
+		{flagName: "a", key: keyServerAddress, valueType: "string"},
+		{flagName: "b", key: keyBaseURL, valueType: "string"},
+		{flagName: "f", key: keyFileStoragePath, valueType: "string"},
+		{flagName: "d", key: keyDatabaseDSN, valueType: "string"},
+		{flagName: "audit-file", key: keyAuditFile, valueType: "string"},
+		{flagName: "audit-url", key: keyAuditURL, valueType: "string"},
+		{flagName: "s", key: keyEnableHTTPS, valueType: "bool"},
+		{flagName: "tls-cert-file", key: keyTLSCertFile, valueType: "string"},
+		{flagName: "tls-key-file", key: keyTLSKeyFile, valueType: "string"},
 	}
-	var fileCfg fileConfig
-	if err := json.Unmarshal(content, &fileCfg); err != nil {
-		return fmt.Errorf("parse config file: %w", err)
+	for _, binding := range flagBindings {
+		f := flagSet.Lookup(binding.flagName)
+		if f == nil {
+			return fmt.Errorf("flag %q is not registered", binding.flagName)
+		}
+		err := v.BindFlagValue(binding.key, stdFlagValue{
+			flag:      f,
+			flagSet:   flagSet,
+			valueType: binding.valueType,
+			key:       binding.key,
+		})
+		if err != nil {
+			return err
+		}
 	}
-	applyConfigFile(cfg, fileCfg)
 	return nil
 }
 
-func applyConfigFile(cfg *Config, fileCfg fileConfig) {
-	if fileCfg.ServerAddress != nil {
-		cfg.ServerAddress = *fileCfg.ServerAddress
+func configFilePath(v *viper.Viper, flagSet *flag.FlagSet, shortValue, longValue string) string {
+	if flagWasChanged(flagSet, "config") {
+		return longValue
 	}
-	if fileCfg.BaseURL != nil {
-		cfg.BaseAddressShort = *fileCfg.BaseURL
-		cfg.BaseURL = *fileCfg.BaseURL
+	if flagWasChanged(flagSet, "c") {
+		return shortValue
 	}
-	if fileCfg.FileStoragePath != nil {
-		cfg.FileStoragePath = *fileCfg.FileStoragePath
-	}
-	if fileCfg.DatabaseDSN != nil {
-		cfg.Postgres.DataBaseDSN = *fileCfg.DatabaseDSN
-	}
-	if fileCfg.EnableHTTPS != nil {
-		cfg.EnableHTTPS = *fileCfg.EnableHTTPS
-	}
-	if fileCfg.TLSCertFile != nil {
-		cfg.TLSCertFile = *fileCfg.TLSCertFile
-	}
-	if fileCfg.TLSKeyFile != nil {
-		cfg.TLSKeyFile = *fileCfg.TLSKeyFile
-	}
-	if fileCfg.AuditFile != nil {
-		cfg.AuditFile = *fileCfg.AuditFile
-	}
-	if fileCfg.AuditURL != nil {
-		cfg.AuditURL = *fileCfg.AuditURL
+	return v.GetString(keyConfigFilePath)
+}
+
+func flagWasChanged(flagSet *flag.FlagSet, name string) bool {
+	changed := false
+	flagSet.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			changed = true
+		}
+	})
+	return changed
+}
+
+func buildConfig(v *viper.Viper) *Config {
+	baseURL := v.GetString(keyBaseURL)
+	return &Config{
+		AppEnv: v.GetString(keyAppEnv),
+		HTTPServer: HTTPServer{
+			ServerAddress: v.GetString(keyServerAddress),
+			BaseURL:       baseURL,
+			StorageType:   v.GetString(keyStorageType),
+			Timeout:       defaultTimeout,
+			IdleTimeout:   defaultIdleTimeout,
+			AuditFile:     v.GetString(keyAuditFile),
+			AuditURL:      v.GetString(keyAuditURL),
+			EnableHTTPS:   v.GetBool(keyEnableHTTPS),
+			TLSCertFile:   v.GetString(keyTLSCertFile),
+			TLSKeyFile:    v.GetString(keyTLSKeyFile),
+			Postgres: &PostgresConfig{
+				DataBaseDSN:       v.GetString(keyDatabaseDSN),
+				MaxConns:          int32(v.GetInt(keyMaxConns)),
+				MinConns:          int32(v.GetInt(keyMinConns)),
+				MaxConnLifetime:   v.GetDuration(keyMaxConnLifetime),
+				MaxConnIdleTime:   v.GetDuration(keyMaxConnIdleTime),
+				HealthCheckPeriod: v.GetDuration(keyHealthCheckPeriod),
+			},
+		},
+		BaseAddressShort: baseURL,
+		FileStoragePath:  v.GetString(keyFileStoragePath),
+		SecretKey:        SecretKey,
 	}
 }
