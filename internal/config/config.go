@@ -1,13 +1,32 @@
 package config
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/caarlos0/env/v11"
 )
 
 const (
+	defaultServerAddress    = "localhost:8080"
+	defaultBaseURL          = "http://localhost:8080"
+	defaultFileStoragePath  = "shortenest_url.txt"
+	defaultDatabaseDSN      = ""
+	defaultAuditFile        = ""
+	defaultAuditURL         = ""
+	defaultConfigFilePath   = ""
+	defaultHTTPS            = false
+	defaultTimeout          = time.Second * 4
+	defaultIdleTimeout      = time.Second * 30
+	defaultMaxConns         = 30
+	defaultMinConns         = 3
+	defaultMaxConnLifetime  = time.Duration(30) * time.Minute
+	defaultMaxConnIdleTime  = time.Duration(10) * time.Minute
+	defaultHealthCheckDelay = time.Duration(30) * time.Second
+
 	// ProdEnv identifies the production logger and runtime mode.
 	ProdEnv = "production"
 	// SecretKey is the default AES key used to encrypt the user cookie.
@@ -20,7 +39,7 @@ type Config struct {
 	AppEnv string `env:"APP_ENV" envDefault:"development"`
 	HTTPServer
 	// BaseAddressShort is the public base URL used to build shortened links.
-	BaseAddressShort string
+	BaseAddressShort string `env:"BASE_URL"`
 	// FileStoragePath points to the JSONL file used by the in-memory repository.
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	// SecretKey is the AES key used by the authentication service.
@@ -31,8 +50,8 @@ type Config struct {
 type HTTPServer struct {
 	// ServerAddress is the bind address of the HTTP server.
 	ServerAddress string `env:"SERVER_ADDRESS"`
-	// BaseURL is an optional source base URL for deployments that need it.
-	BaseURL string `env:"BASE_URL"`
+	// BaseURL duplicates BaseAddressShort for callers that read HTTP server settings directly.
+	BaseURL string `env:"-"`
 	// StorageType names the configured storage backend.
 	StorageType string `env:"STORAGE_TYPE"`
 	// AuditFile enables file-based audit logging when it is not empty.
@@ -65,44 +84,171 @@ type PostgresConfig struct {
 	HealthCheckPeriod time.Duration `env:"HEALTH_CHECK_PERIOD"`
 }
 
+type cliConfig struct {
+	serverAddress    string
+	baseAddressShort string
+	fileStoragePath  string
+	databaseDSN      string
+	auditFile        string
+	auditURL         string
+	configFilePath   string
+	enableHTTPS      bool
+}
+
+type fileConfig struct {
+	ServerAddress   *string `json:"server_address"`
+	BaseURL         *string `json:"base_url"`
+	FileStoragePath *string `json:"file_storage_path"`
+	DatabaseDSN     *string `json:"database_dsn"`
+	EnableHTTPS     *bool   `json:"enable_https"`
+	AuditFile       *string `json:"audit_file"`
+	AuditURL        *string `json:"audit_url"`
+}
+
 // InitConfig parses flags and environment variables into Config.
 func InitConfig() (*Config, error) {
-	h := flag.String("a", "localhost:8080", "host address server")
-	b := flag.String("b", "http://localhost:8080", "base url for short url")
-	f := flag.String("f", "shortenest_url.txt", "file storage path")
-	d := flag.String("d", "", "dsn connection to db")
-	auditFile := flag.String("audit-file", "", "file audit storage path")
-	auditURL := flag.String("audit-url", "", "audit url")
-	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
+	cli := cliConfig{
+		serverAddress:    defaultServerAddress,
+		baseAddressShort: defaultBaseURL,
+		fileStoragePath:  defaultFileStoragePath,
+		databaseDSN:      defaultDatabaseDSN,
+		auditFile:        defaultAuditFile,
+		auditURL:         defaultAuditURL,
+		configFilePath:   configFilePathFromEnv(),
+		enableHTTPS:      defaultHTTPS,
+	}
+
+	flag.StringVar(&cli.serverAddress, "a", cli.serverAddress, "host address server")
+	flag.StringVar(&cli.baseAddressShort, "b", cli.baseAddressShort, "base url for short url")
+	flag.StringVar(&cli.fileStoragePath, "f", cli.fileStoragePath, "file storage path")
+	flag.StringVar(&cli.databaseDSN, "d", cli.databaseDSN, "dsn connection to db")
+	flag.StringVar(&cli.auditFile, "audit-file", cli.auditFile, "file audit storage path")
+	flag.StringVar(&cli.auditURL, "audit-url", cli.auditURL, "audit url")
+	flag.StringVar(&cli.configFilePath, "c", cli.configFilePath, "json config file path")
+	flag.StringVar(&cli.configFilePath, "config", cli.configFilePath, "json config file path")
+	flag.BoolVar(&cli.enableHTTPS, "s", cli.enableHTTPS, "enable HTTPS")
 
 	flag.Parse()
 
-	cfg := Config{
-		HTTPServer: HTTPServer{
-			ServerAddress: *h,
-			Timeout:       time.Second * 4,
-			IdleTimeout:   time.Second * 30,
-			AuditFile:     *auditFile,
-			AuditURL:      *auditURL,
-			EnableHTTPS:   *enableHTTPS,
-			Postgres: &PostgresConfig{
-				DataBaseDSN:       *d,
-				MaxConns:          30,
-				MinConns:          3,
-				MaxConnLifetime:   time.Duration(30) * time.Minute,
-				MaxConnIdleTime:   time.Duration(10) * time.Minute,
-				HealthCheckPeriod: time.Duration(30) * time.Second,
-			},
-		},
-		BaseAddressShort: *b,
-		FileStoragePath:  *f,
+	cfg := newDefaultConfig()
+	if cli.configFilePath != defaultConfigFilePath {
+		if err := loadConfigFile(&cfg, cli.configFilePath); err != nil {
+			return nil, err
+		}
 	}
 
-	err := env.Parse(&cfg)
-	if err != nil {
+	flags := parsedFlags()
+	applyFlags(&cfg, cli, flags)
+
+	if err := env.Parse(&cfg); err != nil {
 		return nil, err
 	}
-	cfg.EnableHTTPS = cfg.EnableHTTPS || *enableHTTPS
+	if flags["s"] && cli.enableHTTPS {
+		cfg.EnableHTTPS = true
+	}
+	cfg.BaseURL = cfg.BaseAddressShort
 	cfg.SecretKey = SecretKey
 	return &cfg, nil
+}
+
+func newDefaultConfig() Config {
+	return Config{
+		HTTPServer: HTTPServer{
+			ServerAddress: defaultServerAddress,
+			BaseURL:       defaultBaseURL,
+			Timeout:       defaultTimeout,
+			IdleTimeout:   defaultIdleTimeout,
+			AuditFile:     defaultAuditFile,
+			AuditURL:      defaultAuditURL,
+			EnableHTTPS:   defaultHTTPS,
+			Postgres: &PostgresConfig{
+				DataBaseDSN:       defaultDatabaseDSN,
+				MaxConns:          defaultMaxConns,
+				MinConns:          defaultMinConns,
+				MaxConnLifetime:   defaultMaxConnLifetime,
+				MaxConnIdleTime:   defaultMaxConnIdleTime,
+				HealthCheckPeriod: defaultHealthCheckDelay,
+			},
+		},
+		BaseAddressShort: defaultBaseURL,
+		FileStoragePath:  defaultFileStoragePath,
+	}
+}
+
+func configFilePathFromEnv() string {
+	if configFilePath, ok := os.LookupEnv("CONFIG"); ok {
+		return configFilePath
+	}
+	return defaultConfigFilePath
+}
+
+func parsedFlags() map[string]bool {
+	flags := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		flags[f.Name] = true
+	})
+	return flags
+}
+
+func applyFlags(cfg *Config, cli cliConfig, flags map[string]bool) {
+	if flags["a"] {
+		cfg.ServerAddress = cli.serverAddress
+	}
+	if flags["b"] {
+		cfg.BaseAddressShort = cli.baseAddressShort
+		cfg.BaseURL = cli.baseAddressShort
+	}
+	if flags["f"] {
+		cfg.FileStoragePath = cli.fileStoragePath
+	}
+	if flags["d"] {
+		cfg.Postgres.DataBaseDSN = cli.databaseDSN
+	}
+	if flags["audit-file"] {
+		cfg.AuditFile = cli.auditFile
+	}
+	if flags["audit-url"] {
+		cfg.AuditURL = cli.auditURL
+	}
+	if flags["s"] {
+		cfg.EnableHTTPS = cli.enableHTTPS
+	}
+}
+
+func loadConfigFile(cfg *Config, configFilePath string) error {
+	content, err := os.ReadFile(configFilePath)
+	if err != nil {
+		return fmt.Errorf("read config file: %w", err)
+	}
+	var fileCfg fileConfig
+	if err := json.Unmarshal(content, &fileCfg); err != nil {
+		return fmt.Errorf("parse config file: %w", err)
+	}
+	applyConfigFile(cfg, fileCfg)
+	return nil
+}
+
+func applyConfigFile(cfg *Config, fileCfg fileConfig) {
+	if fileCfg.ServerAddress != nil {
+		cfg.ServerAddress = *fileCfg.ServerAddress
+	}
+	if fileCfg.BaseURL != nil {
+		cfg.BaseAddressShort = *fileCfg.BaseURL
+		cfg.BaseURL = *fileCfg.BaseURL
+	}
+	if fileCfg.FileStoragePath != nil {
+		cfg.FileStoragePath = *fileCfg.FileStoragePath
+	}
+	if fileCfg.DatabaseDSN != nil {
+		cfg.Postgres.DataBaseDSN = *fileCfg.DatabaseDSN
+	}
+	if fileCfg.EnableHTTPS != nil {
+		cfg.EnableHTTPS = *fileCfg.EnableHTTPS
+	}
+	if fileCfg.AuditFile != nil {
+		cfg.AuditFile = *fileCfg.AuditFile
+	}
+	if fileCfg.AuditURL != nil {
+		cfg.AuditURL = *fileCfg.AuditURL
+	}
 }
