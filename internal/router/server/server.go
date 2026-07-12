@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -125,9 +124,8 @@ func NewServer() (*Server, error) {
 
 // Start runs the HTTP server until an interrupt or termination signal is received.
 func (s *Server) Start() error {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	defer signal.Stop(quit)
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
 	go func() {
 		s.appLogger.Info("Server listening on",
@@ -139,8 +137,9 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	sig := <-quit
-	s.appLogger.Info("Server shutting down...", zap.String("signal", sig.String()))
+	<-shutdownCtx.Done()
+	stop()
+	s.appLogger.Info("Server shutting down...")
 
 	shutdownErr := s.httpServer.Shutdown(context.Background())
 	if shutdownErr != nil {
