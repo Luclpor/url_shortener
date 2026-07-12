@@ -18,6 +18,8 @@ const (
 	defaultAuditFile        = ""
 	defaultAuditURL         = ""
 	defaultConfigFilePath   = ""
+	defaultTLSCertFile      = ""
+	defaultTLSKeyFile       = ""
 	defaultHTTPS            = false
 	defaultTimeout          = time.Second * 4
 	defaultIdleTimeout      = time.Second * 30
@@ -60,6 +62,10 @@ type HTTPServer struct {
 	AuditURL string `env:"AUDIT_URL"`
 	// EnableHTTPS switches the web server to TLS.
 	EnableHTTPS bool `env:"ENABLE_HTTPS"`
+	// TLSCertFile is a path to the TLS public certificate file.
+	TLSCertFile string `env:"TLS_CERT_FILE"`
+	// TLSKeyFile is a path to the TLS private key file.
+	TLSKeyFile string `env:"TLS_KEY_FILE"`
 	// Postgres holds PostgreSQL connection pool settings.
 	Postgres *PostgresConfig
 	// Timeout is applied to HTTP read and write operations.
@@ -93,6 +99,8 @@ type cliConfig struct {
 	auditURL         string
 	configFilePath   string
 	enableHTTPS      bool
+	tlsCertFile      string
+	tlsKeyFile       string
 }
 
 type fileConfig struct {
@@ -101,6 +109,8 @@ type fileConfig struct {
 	FileStoragePath *string `json:"file_storage_path"`
 	DatabaseDSN     *string `json:"database_dsn"`
 	EnableHTTPS     *bool   `json:"enable_https"`
+	TLSCertFile     *string `json:"tls_cert_file"`
+	TLSKeyFile      *string `json:"tls_key_file"`
 	AuditFile       *string `json:"audit_file"`
 	AuditURL        *string `json:"audit_url"`
 }
@@ -116,6 +126,8 @@ func InitConfig() (*Config, error) {
 		auditURL:         defaultAuditURL,
 		configFilePath:   configFilePathFromEnv(),
 		enableHTTPS:      defaultHTTPS,
+		tlsCertFile:      defaultTLSCertFile,
+		tlsKeyFile:       defaultTLSKeyFile,
 	}
 
 	flag.StringVar(&cli.serverAddress, "a", cli.serverAddress, "host address server")
@@ -127,6 +139,8 @@ func InitConfig() (*Config, error) {
 	flag.StringVar(&cli.configFilePath, "c", cli.configFilePath, "json config file path")
 	flag.StringVar(&cli.configFilePath, "config", cli.configFilePath, "json config file path")
 	flag.BoolVar(&cli.enableHTTPS, "s", cli.enableHTTPS, "enable HTTPS")
+	flag.StringVar(&cli.tlsCertFile, "tls-cert-file", cli.tlsCertFile, "TLS public certificate file path")
+	flag.StringVar(&cli.tlsKeyFile, "tls-key-file", cli.tlsKeyFile, "TLS private key file path")
 
 	flag.Parse()
 
@@ -161,6 +175,8 @@ func newDefaultConfig() Config {
 			AuditFile:     defaultAuditFile,
 			AuditURL:      defaultAuditURL,
 			EnableHTTPS:   defaultHTTPS,
+			TLSCertFile:   defaultTLSCertFile,
+			TLSKeyFile:    defaultTLSKeyFile,
 			Postgres: &PostgresConfig{
 				DataBaseDSN:       defaultDatabaseDSN,
 				MaxConns:          defaultMaxConns,
@@ -213,6 +229,12 @@ func applyFlags(cfg *Config, cli cliConfig, flags map[string]bool) {
 	if flags["s"] {
 		cfg.EnableHTTPS = cli.enableHTTPS
 	}
+	if flags["tls-cert-file"] {
+		cfg.TLSCertFile = cli.tlsCertFile
+	}
+	if flags["tls-key-file"] {
+		cfg.TLSKeyFile = cli.tlsKeyFile
+	}
 }
 
 func loadConfigFile(cfg *Config, configFilePath string) error {
@@ -244,6 +266,12 @@ func applyConfigFile(cfg *Config, fileCfg fileConfig) {
 	}
 	if fileCfg.EnableHTTPS != nil {
 		cfg.EnableHTTPS = *fileCfg.EnableHTTPS
+	}
+	if fileCfg.TLSCertFile != nil {
+		cfg.TLSCertFile = *fileCfg.TLSCertFile
+	}
+	if fileCfg.TLSKeyFile != nil {
+		cfg.TLSKeyFile = *fileCfg.TLSKeyFile
 	}
 	if fileCfg.AuditFile != nil {
 		cfg.AuditFile = *fileCfg.AuditFile

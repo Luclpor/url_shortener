@@ -25,10 +25,12 @@ const shutdownTimeout = 10 * time.Second
 
 // Server owns the configured HTTP server and shutdown resources.
 type Server struct {
-	httpServer *http.Server
-	closers    []func() error
-	appLogger  *zap.Logger
-	useHTTPS   bool
+	httpServer  *http.Server
+	closers     []func() error
+	appLogger   *zap.Logger
+	useHTTPS    bool
+	tlsCertFile string
+	tlsKeyFile  string
 }
 
 // NewServer creates a fully configured URL shortener server.
@@ -117,9 +119,11 @@ func NewServer() (*Server, error) {
 			WriteTimeout: cfg.Timeout,
 			IdleTimeout:  cfg.IdleTimeout,
 		},
-		closers:   closers,
-		appLogger: appLogger,
-		useHTTPS:  cfg.EnableHTTPS,
+		closers:     closers,
+		appLogger:   appLogger,
+		useHTTPS:    cfg.EnableHTTPS,
+		tlsCertFile: cfg.TLSCertFile,
+		tlsKeyFile:  cfg.TLSKeyFile,
 	}
 
 	return server, nil
@@ -190,7 +194,7 @@ func (s *Server) listenAndServe() error {
 		return s.httpServer.ListenAndServe()
 	}
 
-	certificate, err := newSelfSignedCertificate(s.httpServer.Addr)
+	certificate, err := s.tlsCertificate()
 	if err != nil {
 		return err
 	}
@@ -203,4 +207,14 @@ func (s *Server) listenAndServe() error {
 		return err
 	}
 	return s.httpServer.Serve(listener)
+}
+
+func (s *Server) tlsCertificate() (tls.Certificate, error) {
+	if (s.tlsCertFile == "") != (s.tlsKeyFile == "") {
+		return tls.Certificate{}, errors.New("tls cert file and tls key file must be set together")
+	}
+	if s.tlsCertFile != "" || s.tlsKeyFile != "" {
+		return tls.LoadX509KeyPair(s.tlsCertFile, s.tlsKeyFile)
+	}
+	return newSelfSignedCertificate(s.httpServer.Addr)
 }

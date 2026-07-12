@@ -56,6 +56,8 @@ func TestInitConfigLoadsJSONConfigFileFromFlag(t *testing.T) {
 		"file_storage_path": "/tmp/urls.db",
 		"database_dsn": "postgres://user:pass@localhost:5432/shortener",
 		"enable_https": true,
+		"tls_cert_file": "/tmp/cert.pem",
+		"tls_key_file": "/tmp/key.pem",
 		"audit_file": "/tmp/audit.log",
 		"audit_url": "http://audit.test/events"
 	}`)
@@ -72,6 +74,8 @@ func TestInitConfigLoadsJSONConfigFileFromFlag(t *testing.T) {
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://short.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/urls.db")
 	assertConfigValue(t, "DataBaseDSN", cfg.Postgres.DataBaseDSN, "postgres://user:pass@localhost:5432/shortener")
+	assertConfigValue(t, "TLSCertFile", cfg.TLSCertFile, "/tmp/cert.pem")
+	assertConfigValue(t, "TLSKeyFile", cfg.TLSKeyFile, "/tmp/key.pem")
 	assertConfigValue(t, "AuditFile", cfg.AuditFile, "/tmp/audit.log")
 	assertConfigValue(t, "AuditURL", cfg.AuditURL, "http://audit.test/events")
 	if !cfg.EnableHTTPS {
@@ -85,7 +89,9 @@ func TestInitConfigLoadsJSONConfigFileFromEnv(t *testing.T) {
 		"base_url": "https://env-config.test",
 		"file_storage_path": "/tmp/env-config.db",
 		"database_dsn": "config-env-dsn",
-		"enable_https": true
+		"enable_https": true,
+		"tls_cert_file": "/tmp/env-config-cert.pem",
+		"tls_key_file": "/tmp/env-config-key.pem"
 	}`)
 	resetConfigTestState(t, []string{"shortener"})
 	clearConfigEnv(t)
@@ -101,6 +107,8 @@ func TestInitConfigLoadsJSONConfigFileFromEnv(t *testing.T) {
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://env-config.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/env-config.db")
 	assertConfigValue(t, "DataBaseDSN", cfg.Postgres.DataBaseDSN, "config-env-dsn")
+	assertConfigValue(t, "TLSCertFile", cfg.TLSCertFile, "/tmp/env-config-cert.pem")
+	assertConfigValue(t, "TLSKeyFile", cfg.TLSKeyFile, "/tmp/env-config-key.pem")
 	if !cfg.EnableHTTPS {
 		t.Fatal("InitConfig() should enable HTTPS from CONFIG file")
 	}
@@ -113,6 +121,8 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 		"file_storage_path": "/tmp/config.db",
 		"database_dsn": "config-dsn",
 		"enable_https": false,
+		"tls_cert_file": "/tmp/config-cert.pem",
+		"tls_key_file": "/tmp/config-key.pem",
 		"audit_file": "/tmp/config-audit.log",
 		"audit_url": "http://config-audit.test/events"
 	}`)
@@ -125,6 +135,8 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 		"-d", "flag-dsn",
 		"-audit-file", "/tmp/flag-audit.log",
 		"-audit-url", "http://flag-audit.test/events",
+		"-tls-cert-file", "/tmp/flag-cert.pem",
+		"-tls-key-file", "/tmp/flag-key.pem",
 		"-s",
 	})
 	clearConfigEnv(t)
@@ -139,6 +151,8 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://flag.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/flag.db")
 	assertConfigValue(t, "DataBaseDSN", cfg.Postgres.DataBaseDSN, "flag-dsn")
+	assertConfigValue(t, "TLSCertFile", cfg.TLSCertFile, "/tmp/flag-cert.pem")
+	assertConfigValue(t, "TLSKeyFile", cfg.TLSKeyFile, "/tmp/flag-key.pem")
 	assertConfigValue(t, "AuditFile", cfg.AuditFile, "/tmp/flag-audit.log")
 	assertConfigValue(t, "AuditURL", cfg.AuditURL, "http://flag-audit.test/events")
 	if !cfg.EnableHTTPS {
@@ -153,6 +167,8 @@ func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 		"file_storage_path": "/tmp/config.db",
 		"database_dsn": "config-dsn",
 		"enable_https": true,
+		"tls_cert_file": "/tmp/config-cert.pem",
+		"tls_key_file": "/tmp/config-key.pem",
 		"audit_file": "/tmp/config-audit.log",
 		"audit_url": "http://config-audit.test/events"
 	}`)
@@ -163,6 +179,8 @@ func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 	t.Setenv("FILE_STORAGE_PATH", "/tmp/env.db")
 	t.Setenv("DATABASE_DSN", "env-dsn")
 	t.Setenv("ENABLE_HTTPS", "false")
+	t.Setenv("TLS_CERT_FILE", "/tmp/env-cert.pem")
+	t.Setenv("TLS_KEY_FILE", "/tmp/env-key.pem")
 	t.Setenv("AUDIT_FILE", "/tmp/env-audit.log")
 	t.Setenv("AUDIT_URL", "http://env-audit.test/events")
 
@@ -176,6 +194,8 @@ func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://env.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/env.db")
 	assertConfigValue(t, "DataBaseDSN", cfg.Postgres.DataBaseDSN, "env-dsn")
+	assertConfigValue(t, "TLSCertFile", cfg.TLSCertFile, "/tmp/env-cert.pem")
+	assertConfigValue(t, "TLSKeyFile", cfg.TLSKeyFile, "/tmp/env-key.pem")
 	assertConfigValue(t, "AuditFile", cfg.AuditFile, "/tmp/env-audit.log")
 	assertConfigValue(t, "AuditURL", cfg.AuditURL, "http://env-audit.test/events")
 	if cfg.EnableHTTPS {
@@ -208,6 +228,8 @@ func clearConfigEnv(t *testing.T) {
 		"FILE_STORAGE_PATH",
 		"DATABASE_DSN",
 		"ENABLE_HTTPS",
+		"TLS_CERT_FILE",
+		"TLS_KEY_FILE",
 		"AUDIT_FILE",
 		"AUDIT_URL",
 	}

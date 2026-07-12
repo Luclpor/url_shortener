@@ -14,14 +14,23 @@ import (
 )
 
 func newSelfSignedCertificate(addr string) (tls.Certificate, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	certificatePEM, privateKeyPEM, err := GenerateSelfSignedCertificatePEM(addr)
 	if err != nil {
 		return tls.Certificate{}, err
+	}
+	return tls.X509KeyPair(certificatePEM, privateKeyPEM)
+}
+
+// GenerateSelfSignedCertificatePEM generates a self-signed TLS certificate and private key in PEM format.
+func GenerateSelfSignedCertificatePEM(addr string) ([]byte, []byte, error) {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return nil, nil, err
 	}
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		return tls.Certificate{}, err
+		return nil, nil, err
 	}
 	dnsNames, ipAddresses := certificateHosts(addr)
 	template := x509.Certificate{
@@ -39,11 +48,11 @@ func newSelfSignedCertificate(addr string) (tls.Certificate, error) {
 	}
 	certificateDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
 	if err != nil {
-		return tls.Certificate{}, err
+		return nil, nil, err
 	}
 	certificatePEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificateDER})
 	privateKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(privateKey)})
-	return tls.X509KeyPair(certificatePEM, privateKeyPEM)
+	return certificatePEM, privateKeyPEM, nil
 }
 
 func certificateHosts(addr string) ([]string, []net.IP) {

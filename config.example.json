@@ -4,6 +4,8 @@
   "file_storage_path": "shortenest_url.txt",
   "database_dsn": "",
   "enable_https": false,
+  "tls_cert_file": "",
+  "tls_key_file": "",
   "audit_file": "",
   "audit_url": ""
 }
