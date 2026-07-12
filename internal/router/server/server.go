@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/config/db"
@@ -19,6 +20,8 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 	"go.uber.org/zap"
 )
+
+const shutdownTimeout = 10 * time.Second
 
 // Server owns the configured HTTP server and shutdown resources.
 type Server struct {
@@ -143,7 +146,10 @@ func (s *Server) Start() error {
 		stop()
 		s.appLogger.Info("Server shutting down...")
 
-		shutdownErr := s.httpServer.Shutdown(context.Background())
+		shutdownTimeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		shutdownErr := s.httpServer.Shutdown(shutdownTimeoutCtx)
 		if shutdownErr != nil {
 			s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
 		}
