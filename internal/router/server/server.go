@@ -127,30 +127,43 @@ func (s *Server) Start() error {
 	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
+	serverErrCh := make(chan error, 1)
 	go func() {
 		s.appLogger.Info("Server listening on",
 			zap.String("server_address", s.httpServer.Addr),
 			zap.Bool("https_enabled", s.useHTTPS),
 		)
 		if err := s.listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.appLogger.Fatal("Error starting server", zap.Error(err))
+			serverErrCh <- err
 		}
 	}()
 
-	<-shutdownCtx.Done()
-	stop()
-	s.appLogger.Info("Server shutting down...")
+	select {
+	case <-shutdownCtx.Done():
+		stop()
+		s.appLogger.Info("Server shutting down...")
 
-	shutdownErr := s.httpServer.Shutdown(context.Background())
-	if shutdownErr != nil {
-		s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
-	}
-	closeErr := s.closeResources()
-	if closeErr != nil {
-		s.appLogger.Error("server resources close failed", zap.Error(closeErr))
-	}
-	if err := errors.Join(shutdownErr, closeErr); err != nil {
-		return err
+		shutdownErr := s.httpServer.Shutdown(context.Background())
+		if shutdownErr != nil {
+			s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
+		}
+		closeErr := s.closeResources()
+		if closeErr != nil {
+			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
+		}
+		if err := errors.Join(shutdownErr, closeErr); err != nil {
+			return err
+		}
+	case serverErr := <-serverErrCh:
+		s.appLogger.Error("Error starting server", zap.Error(serverErr))
+
+		closeErr := s.closeResources()
+		if closeErr != nil {
+			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
+		}
+		if err := errors.Join(serverErr, closeErr); err != nil {
+			return err
+		}
 	}
 	s.appLogger.Info("Server exited properly")
 	return nil
