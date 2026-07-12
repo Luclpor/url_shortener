@@ -39,6 +39,8 @@ type HTTPServer struct {
 	AuditFile string `env:"AUDIT_FILE"`
 	// AuditURL enables HTTP audit delivery when it is not empty.
 	AuditURL string `env:"AUDIT_URL"`
+	// EnableHTTPS switches the web server to TLS.
+	EnableHTTPS bool `env:"ENABLE_HTTPS"`
 	// Postgres holds PostgreSQL connection pool settings.
 	Postgres *PostgresConfig
 	// Timeout is applied to HTTP read and write operations.
@@ -71,6 +73,7 @@ func InitConfig() (*Config, error) {
 	d := flag.String("d", "", "dsn connection to db")
 	auditFile := flag.String("audit-file", "", "file audit storage path")
 	auditURL := flag.String("audit-url", "", "audit url")
+	enableHTTPS := flag.Bool("s", false, "enable HTTPS")
 
 	flag.Parse()
 
@@ -81,6 +84,7 @@ func InitConfig() (*Config, error) {
 			IdleTimeout:   time.Second * 30,
 			AuditFile:     *auditFile,
 			AuditURL:      *auditURL,
+			EnableHTTPS:   *enableHTTPS,
 			Postgres: &PostgresConfig{
 				DataBaseDSN:       *d,
 				MaxConns:          30,
@@ -98,6 +102,7 @@ func InitConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg.EnableHTTPS = cfg.EnableHTTPS || *enableHTTPS
 	cfg.SecretKey = SecretKey
 	return &cfg, nil
 }

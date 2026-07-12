@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"os"
@@ -30,6 +31,7 @@ type Server struct {
 	httpServer *http.Server
 	closers    []func() error
 	appLogger  *zap.Logger
+	useHTTPS   bool
 }
 
 // NewServer creates a fully configured URL shortener server.
@@ -111,15 +113,16 @@ func NewServer() (*Server, error) {
 	}
 
 	server := &Server{
-		&http.Server{
+		httpServer: &http.Server{
 			Addr:         cfg.ServerAddress,
 			Handler:      router,
 			ReadTimeout:  cfg.Timeout,
 			WriteTimeout: cfg.Timeout,
 			IdleTimeout:  cfg.IdleTimeout,
 		},
-		closers,
-		appLogger,
+		closers:   closers,
+		appLogger: appLogger,
+		useHTTPS:  cfg.EnableHTTPS,
 	}
 
 	return server, nil
@@ -134,8 +137,9 @@ func (s *Server) Start() error {
 	go func() {
 		s.appLogger.Info("Server listening on",
 			zap.String("server_address", s.httpServer.Addr),
+			zap.Bool("https_enabled", s.useHTTPS),
 		)
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			s.appLogger.Fatal("Error starting server", zap.Error(err))
 		}
 	}()
@@ -158,4 +162,24 @@ func (s *Server) Start() error {
 	}
 	s.appLogger.Info("Server exited properly")
 	return nil
+}
+
+func (s *Server) listenAndServe() error {
+	if !s.useHTTPS {
+		return s.httpServer.ListenAndServe()
+	}
+
+	certificate, err := newSelfSignedCertificate(s.httpServer.Addr)
+	if err != nil {
+		return err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+	}
+	listener, err := tls.Listen("tcp", s.httpServer.Addr, tlsConfig)
+	if err != nil {
+		return err
+	}
+	return s.httpServer.Serve(listener)
 }
