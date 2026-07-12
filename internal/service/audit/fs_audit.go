@@ -2,6 +2,7 @@ package audit
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"sync"
 )
@@ -42,7 +43,9 @@ func (sa *storageAuditor) saveAuditFS(evAudit *EventAudit) error {
 	return nil
 }
 
-// Close closes the file used by the storage auditor.
+// Close flushes audit events to disk and closes the file used by the storage auditor.
 func (sa *storageAuditor) Close() error {
-	return sa.file.Close()
+	sa.mu.Lock()
+	defer sa.mu.Unlock()
+	return errors.Join(sa.file.Sync(), sa.file.Close())
 }

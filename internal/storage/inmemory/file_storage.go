@@ -3,6 +3,7 @@ package inmemory
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 
 	"github.com/Luclpor/url_shortener.git/internal/model"
@@ -26,9 +27,9 @@ func NewFileStorage(filePath string) (*FileStorage, error) {
 	}, nil
 }
 
-// Close closes the underlying storage file.
+// Close flushes storage data to disk and closes the underlying file.
 func (s *FileStorage) Close() error {
-	return s.file.Close()
+	return errors.Join(s.file.Sync(), s.file.Close())
 }
 
 // SaveInFile appends one URL record to the storage file.

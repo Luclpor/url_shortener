@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/config/db"
@@ -20,10 +19,6 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 	"go.uber.org/zap"
-)
-
-const (
-	shutdownTimeout = 10 * time.Second
 )
 
 // Server owns the configured HTTP server and shutdown resources.
@@ -131,7 +126,7 @@ func NewServer() (*Server, error) {
 // Start runs the HTTP server until an interrupt or termination signal is received.
 func (s *Server) Start() error {
 	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer signal.Stop(quit)
 
 	go func() {
@@ -144,24 +139,32 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	<-quit
-	s.appLogger.Info("Server shutting down...")
+	sig := <-quit
+	s.appLogger.Info("Server shutting down...", zap.String("signal", sig.String()))
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		s.appLogger.Error("server forced to shutdown", zap.Error(err))
-		return err
+	shutdownErr := s.httpServer.Shutdown(context.Background())
+	if shutdownErr != nil {
+		s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
 	}
-	for _, closeFn := range s.closers {
-		if err := closeFn(); err != nil {
-			s.appLogger.Error("close function failed", zap.Error(err))
-			return err
-		}
+	closeErr := s.closeResources()
+	if closeErr != nil {
+		s.appLogger.Error("server resources close failed", zap.Error(closeErr))
+	}
+	if err := errors.Join(shutdownErr, closeErr); err != nil {
+		return err
 	}
 	s.appLogger.Info("Server exited properly")
 	return nil
+}
+
+func (s *Server) closeResources() error {
+	var closeErr error
+	for _, closeFn := range s.closers {
+		if err := closeFn(); err != nil {
+			closeErr = errors.Join(closeErr, err)
+		}
+	}
+	return closeErr
 }
 
 func (s *Server) listenAndServe() error {
