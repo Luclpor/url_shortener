@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -21,15 +21,16 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	shutdownTimeout = 10 * time.Second
-)
+const shutdownTimeout = 10 * time.Second
 
 // Server owns the configured HTTP server and shutdown resources.
 type Server struct {
-	httpServer *http.Server
-	closers    []func() error
-	appLogger  *zap.Logger
+	httpServer  *http.Server
+	closers     []func() error
+	appLogger   *zap.Logger
+	useHTTPS    bool
+	tlsCertFile string
+	tlsKeyFile  string
 }
 
 // NewServer creates a fully configured URL shortener server.
@@ -111,15 +112,18 @@ func NewServer() (*Server, error) {
 	}
 
 	server := &Server{
-		&http.Server{
+		httpServer: &http.Server{
 			Addr:         cfg.ServerAddress,
 			Handler:      router,
 			ReadTimeout:  cfg.Timeout,
 			WriteTimeout: cfg.Timeout,
 			IdleTimeout:  cfg.IdleTimeout,
 		},
-		closers,
-		appLogger,
+		closers:     closers,
+		appLogger:   appLogger,
+		useHTTPS:    cfg.EnableHTTPS,
+		tlsCertFile: cfg.TLSCertFile,
+		tlsKeyFile:  cfg.TLSKeyFile,
 	}
 
 	return server, nil
@@ -127,35 +131,90 @@ func NewServer() (*Server, error) {
 
 // Start runs the HTTP server until an interrupt or termination signal is received.
 func (s *Server) Start() error {
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-	defer signal.Stop(quit)
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
+	serverErrCh := make(chan error, 1)
 	go func() {
 		s.appLogger.Info("Server listening on",
 			zap.String("server_address", s.httpServer.Addr),
+			zap.Bool("https_enabled", s.useHTTPS),
 		)
-		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			s.appLogger.Fatal("Error starting server", zap.Error(err))
+		if err := s.listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrCh <- err
 		}
 	}()
 
-	<-quit
-	s.appLogger.Info("Server shutting down...")
+	select {
+	case <-shutdownCtx.Done():
+		stop()
+		s.appLogger.Info("Server shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
+		shutdownTimeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
 
-	if err := s.httpServer.Shutdown(ctx); err != nil {
-		s.appLogger.Error("server forced to shutdown", zap.Error(err))
-		return err
-	}
-	for _, closeFn := range s.closers {
-		if err := closeFn(); err != nil {
-			s.appLogger.Error("close function failed", zap.Error(err))
+		shutdownErr := s.httpServer.Shutdown(shutdownTimeoutCtx)
+		if shutdownErr != nil {
+			s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
+		}
+		closeErr := s.closeResources()
+		if closeErr != nil {
+			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
+		}
+		if err := errors.Join(shutdownErr, closeErr); err != nil {
+			return err
+		}
+	case serverErr := <-serverErrCh:
+		s.appLogger.Error("Error starting server", zap.Error(serverErr))
+
+		closeErr := s.closeResources()
+		if closeErr != nil {
+			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
+		}
+		if err := errors.Join(serverErr, closeErr); err != nil {
 			return err
 		}
 	}
 	s.appLogger.Info("Server exited properly")
 	return nil
+}
+
+func (s *Server) closeResources() error {
+	var closeErr error
+	for _, closeFn := range s.closers {
+		if err := closeFn(); err != nil {
+			closeErr = errors.Join(closeErr, err)
+		}
+	}
+	return closeErr
+}
+
+func (s *Server) listenAndServe() error {
+	if !s.useHTTPS {
+		return s.httpServer.ListenAndServe()
+	}
+
+	certificate, err := s.tlsCertificate()
+	if err != nil {
+		return err
+	}
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS12,
+	}
+	listener, err := tls.Listen("tcp", s.httpServer.Addr, tlsConfig)
+	if err != nil {
+		return err
+	}
+	return s.httpServer.Serve(listener)
+}
+
+func (s *Server) tlsCertificate() (tls.Certificate, error) {
+	if (s.tlsCertFile == "") != (s.tlsKeyFile == "") {
+		return tls.Certificate{}, errors.New("tls cert file and tls key file must be set together")
+	}
+	if s.tlsCertFile != "" || s.tlsKeyFile != "" {
+		return tls.LoadX509KeyPair(s.tlsCertFile, s.tlsKeyFile)
+	}
+	return newSelfSignedCertificate(s.httpServer.Addr)
 }

@@ -224,7 +224,6 @@ func (h *Handler) NewDeleteBatchHandler() http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusAccepted)
-		return
 	}
 }
 
