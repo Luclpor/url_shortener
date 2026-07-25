@@ -96,6 +96,10 @@ func (r *benchmarkURLRepository) DeleteBatch(_ context.Context, deleteShortURLs 
 	return nil
 }
 
+func (r *benchmarkURLRepository) GetStats(_ context.Context) (int, int, error) {
+	return len(r.urlsByShort), 1, nil
+}
+
 func BenchmarkGenerateRandomString(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = GenerateRandomString(5)

@@ -203,6 +203,13 @@ func (r *exampleURLRepository) DeleteBatch(_ context.Context, deleteShortURLs ma
 	return nil
 }
 
+func (r *exampleURLRepository) GetStats(_ context.Context) (int, int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return len(r.urls), 1, nil
+}
+
 func exampleShortKey(rawURL string) string {
 	parsedURL, err := url.Parse(rawURL)
 	if err == nil {

@@ -156,6 +156,14 @@ func (db *Repository) DeleteBatch(_ context.Context, deleteShortURLs map[uuid.UU
 	return nil
 }
 
+// GetStats returns service-wide URL and user counts.
+func (db *Repository) GetStats(_ context.Context) (int, int, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	return len(db.urls), len(db.users), nil
+}
+
 // Close closes the repository file storage.
 func (db *Repository) Close() error {
 	return db.fileStorage.Close()
