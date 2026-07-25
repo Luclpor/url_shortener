@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
@@ -257,4 +259,40 @@ func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 		}
 		render.JSON(w, r, urls)
 	}
+}
+
+// NewStatsHandler returns a handler for GET /api/internal/stats.
+func (h *Handler) NewStatsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isTrustedIP(h.cfg.TrustedSubnet, r.Header.Get("X-Real-IP")) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		stats, err := h.manager.GetStats(r.Context())
+		if err != nil {
+			h.logger.Error("failed to get stats:", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		render.JSON(w, r, stats)
+	}
+}
+
+func isTrustedIP(trustedSubnet string, realIP string) bool {
+	trustedSubnet = strings.TrimSpace(trustedSubnet)
+	realIP = strings.TrimSpace(realIP)
+	if trustedSubnet == "" || realIP == "" {
+		return false
+	}
+
+	ip := net.ParseIP(realIP)
+	if ip == nil {
+		return false
+	}
+
+	_, subnet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil {
+		return false
+	}
+	return subnet.Contains(ip)
 }

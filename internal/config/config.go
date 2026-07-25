@@ -18,6 +18,7 @@ const (
 	defaultConfigFilePath   = ""
 	defaultTLSCertFile      = ""
 	defaultTLSKeyFile       = ""
+	defaultTrustedSubnet    = ""
 	defaultHTTPS            = false
 	defaultTimeout          = time.Second * 4
 	defaultIdleTimeout      = time.Second * 30
@@ -44,6 +45,7 @@ const (
 	keyEnableHTTPS       = "enable_https"
 	keyTLSCertFile       = "tls_cert_file"
 	keyTLSKeyFile        = "tls_key_file"
+	keyTrustedSubnet     = "trusted_subnet"
 	keyConfigFilePath    = "config"
 	keyDatabaseDSN       = "database_dsn"
 	keyMaxConns          = "max_conns"
@@ -84,6 +86,8 @@ type HTTPServer struct {
 	TLSCertFile string
 	// TLSKeyFile is a path to the TLS private key file.
 	TLSKeyFile string
+	// TrustedSubnet contains CIDR notation of the subnet allowed to access internal endpoints.
+	TrustedSubnet string
 	// Postgres holds PostgreSQL connection pool settings.
 	Postgres *PostgresConfig
 	// Timeout is applied to HTTP read and write operations.
@@ -152,6 +156,7 @@ func InitConfig() (*Config, error) {
 	flagSet.Bool("s", defaultHTTPS, "enable HTTPS")
 	flagSet.String("tls-cert-file", defaultTLSCertFile, "TLS public certificate file path")
 	flagSet.String("tls-key-file", defaultTLSKeyFile, "TLS private key file path")
+	flagSet.String("t", defaultTrustedSubnet, "trusted subnet in CIDR notation")
 
 	flag.Parse()
 
@@ -184,6 +189,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault(keyEnableHTTPS, defaultHTTPS)
 	v.SetDefault(keyTLSCertFile, defaultTLSCertFile)
 	v.SetDefault(keyTLSKeyFile, defaultTLSKeyFile)
+	v.SetDefault(keyTrustedSubnet, defaultTrustedSubnet)
 	v.SetDefault(keyConfigFilePath, defaultConfigFilePath)
 	v.SetDefault(keyDatabaseDSN, defaultDatabaseDSN)
 	v.SetDefault(keyMaxConns, defaultMaxConns)
@@ -205,6 +211,7 @@ func bindEnv(v *viper.Viper) {
 		keyEnableHTTPS:       "ENABLE_HTTPS",
 		keyTLSCertFile:       "TLS_CERT_FILE",
 		keyTLSKeyFile:        "TLS_KEY_FILE",
+		keyTrustedSubnet:     "TRUSTED_SUBNET",
 		keyConfigFilePath:    "CONFIG",
 		keyDatabaseDSN:       "DATABASE_DSN",
 		keyMaxConns:          "MAX_CONNS",
@@ -233,6 +240,7 @@ func bindFlags(v *viper.Viper, flagSet *flag.FlagSet) error {
 		{flagName: "s", key: keyEnableHTTPS, valueType: "bool"},
 		{flagName: "tls-cert-file", key: keyTLSCertFile, valueType: "string"},
 		{flagName: "tls-key-file", key: keyTLSKeyFile, valueType: "string"},
+		{flagName: "t", key: keyTrustedSubnet, valueType: "string"},
 	}
 	for _, binding := range flagBindings {
 		f := flagSet.Lookup(binding.flagName)
@@ -287,6 +295,7 @@ func buildConfig(v *viper.Viper) *Config {
 			EnableHTTPS:   v.GetBool(keyEnableHTTPS),
 			TLSCertFile:   v.GetString(keyTLSCertFile),
 			TLSKeyFile:    v.GetString(keyTLSKeyFile),
+			TrustedSubnet: v.GetString(keyTrustedSubnet),
 			Postgres: &PostgresConfig{
 				DataBaseDSN:       v.GetString(keyDatabaseDSN),
 				MaxConns:          int32(v.GetInt(keyMaxConns)),

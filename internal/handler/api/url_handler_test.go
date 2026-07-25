@@ -424,3 +424,91 @@ func TestGetShortURL(t *testing.T) {
 		})
 	}
 }
+
+func TestStatsHandler(t *testing.T) {
+	tests := []struct {
+		name          string
+		trustedSubnet string
+		realIP        string
+		wantCode      int
+		wantStats     *modelapi.StatsResp
+	}{
+		{
+			name:          "allowed trusted ip",
+			trustedSubnet: "192.168.1.0/24",
+			realIP:        "192.168.1.42",
+			wantCode:      http.StatusOK,
+			wantStats: &modelapi.StatsResp{
+				URLs:  7,
+				Users: 3,
+			},
+		},
+		{
+			name:          "empty trusted subnet forbids",
+			trustedSubnet: "",
+			realIP:        "192.168.1.42",
+			wantCode:      http.StatusForbidden,
+		},
+		{
+			name:          "outside trusted subnet forbids",
+			trustedSubnet: "192.168.1.0/24",
+			realIP:        "192.168.2.42",
+			wantCode:      http.StatusForbidden,
+		},
+		{
+			name:          "invalid real ip forbids",
+			trustedSubnet: "192.168.1.0/24",
+			realIP:        "not-ip",
+			wantCode:      http.StatusForbidden,
+		},
+		{
+			name:          "invalid trusted subnet forbids",
+			trustedSubnet: "not-cidr",
+			realIP:        "192.168.1.42",
+			wantCode:      http.StatusForbidden,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			mockRep := storageMock.NewMockURLRepository(ctrl)
+			if tt.wantStats != nil {
+				mockRep.EXPECT().
+					GetStats(gomock.Any()).
+					Return(tt.wantStats.URLs, tt.wantStats.Users, nil)
+			}
+
+			appLog, _ := logger.InitLogger(config.ProdEnv)
+			manager := service.NewURLManager(mockRep, appLog)
+			handler := NewHandler(&config.Config{
+				HTTPServer: config.HTTPServer{
+					TrustedSubnet: tt.trustedSubnet,
+				},
+			}, nil, manager, testUserAuth{}, new(audit.Event), appLog)
+			statsHandler := handler.NewStatsHandler()
+
+			req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+			req.Header.Set("X-Real-IP", tt.realIP)
+			rec := httptest.NewRecorder()
+
+			statsHandler(rec, req)
+
+			res := rec.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, tt.wantCode, res.StatusCode)
+			if tt.wantStats == nil {
+				return
+			}
+
+			ct := res.Header.Get("Content-Type")
+			require.NotEmpty(t, ct)
+			assert.True(t, strings.HasPrefix(ct, "application/json"), "Content-Type=%q", ct)
+
+			var got modelapi.StatsResp
+			require.NoError(t, json.NewDecoder(res.Body).Decode(&got))
+			assert.Equal(t, *tt.wantStats, got)
+		})
+	}
+}
