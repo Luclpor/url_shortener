@@ -10,6 +10,7 @@ import (
 
 const (
 	defaultServerAddress    = "localhost:8080"
+	defaultGRPCServerAddr   = "localhost:3200"
 	defaultBaseURL          = "http://localhost:8080"
 	defaultFileStoragePath  = "shortenest_url.txt"
 	defaultDatabaseDSN      = ""
@@ -37,6 +38,7 @@ const (
 const (
 	keyAppEnv            = "app_env"
 	keyServerAddress     = "server_address"
+	keyGRPCServerAddress = "grpc_server_address"
 	keyBaseURL           = "base_url"
 	keyFileStoragePath   = "file_storage_path"
 	keyStorageType       = "storage_type"
@@ -72,6 +74,8 @@ type Config struct {
 type HTTPServer struct {
 	// ServerAddress is the bind address of the HTTP server.
 	ServerAddress string
+	// GRPCServerAddress is the bind address of the gRPC server.
+	GRPCServerAddress string
 	// BaseURL duplicates BaseAddressShort for callers that read HTTP server settings directly.
 	BaseURL string
 	// StorageType names the configured storage backend.
@@ -146,6 +150,7 @@ func InitConfig() (*Config, error) {
 	flagSet := flag.CommandLine
 
 	flagSet.String("a", defaultServerAddress, "host address server")
+	flagSet.String("g", defaultGRPCServerAddr, "grpc server address")
 	flagSet.String("b", defaultBaseURL, "base url for short url")
 	flagSet.String("f", defaultFileStoragePath, "file storage path")
 	flagSet.String("d", defaultDatabaseDSN, "dsn connection to db")
@@ -181,6 +186,7 @@ func InitConfig() (*Config, error) {
 func setDefaults(v *viper.Viper) {
 	v.SetDefault(keyAppEnv, "development")
 	v.SetDefault(keyServerAddress, defaultServerAddress)
+	v.SetDefault(keyGRPCServerAddress, defaultGRPCServerAddr)
 	v.SetDefault(keyBaseURL, defaultBaseURL)
 	v.SetDefault(keyFileStoragePath, defaultFileStoragePath)
 	v.SetDefault(keyStorageType, "")
@@ -203,6 +209,7 @@ func bindEnv(v *viper.Viper) {
 	envBindings := map[string]string{
 		keyAppEnv:            "APP_ENV",
 		keyServerAddress:     "SERVER_ADDRESS",
+		keyGRPCServerAddress: "GRPC_SERVER_ADDRESS",
 		keyBaseURL:           "BASE_URL",
 		keyFileStoragePath:   "FILE_STORAGE_PATH",
 		keyStorageType:       "STORAGE_TYPE",
@@ -232,6 +239,7 @@ func bindFlags(v *viper.Viper, flagSet *flag.FlagSet) error {
 		valueType string
 	}{
 		{flagName: "a", key: keyServerAddress, valueType: "string"},
+		{flagName: "g", key: keyGRPCServerAddress, valueType: "string"},
 		{flagName: "b", key: keyBaseURL, valueType: "string"},
 		{flagName: "f", key: keyFileStoragePath, valueType: "string"},
 		{flagName: "d", key: keyDatabaseDSN, valueType: "string"},
@@ -285,17 +293,18 @@ func buildConfig(v *viper.Viper) *Config {
 	return &Config{
 		AppEnv: v.GetString(keyAppEnv),
 		HTTPServer: HTTPServer{
-			ServerAddress: v.GetString(keyServerAddress),
-			BaseURL:       baseURL,
-			StorageType:   v.GetString(keyStorageType),
-			Timeout:       defaultTimeout,
-			IdleTimeout:   defaultIdleTimeout,
-			AuditFile:     v.GetString(keyAuditFile),
-			AuditURL:      v.GetString(keyAuditURL),
-			EnableHTTPS:   v.GetBool(keyEnableHTTPS),
-			TLSCertFile:   v.GetString(keyTLSCertFile),
-			TLSKeyFile:    v.GetString(keyTLSKeyFile),
-			TrustedSubnet: v.GetString(keyTrustedSubnet),
+			ServerAddress:     v.GetString(keyServerAddress),
+			GRPCServerAddress: v.GetString(keyGRPCServerAddress),
+			BaseURL:           baseURL,
+			StorageType:       v.GetString(keyStorageType),
+			Timeout:           defaultTimeout,
+			IdleTimeout:       defaultIdleTimeout,
+			AuditFile:         v.GetString(keyAuditFile),
+			AuditURL:          v.GetString(keyAuditURL),
+			EnableHTTPS:       v.GetBool(keyEnableHTTPS),
+			TLSCertFile:       v.GetString(keyTLSCertFile),
+			TLSKeyFile:        v.GetString(keyTLSKeyFile),
+			TrustedSubnet:     v.GetString(keyTrustedSubnet),
 			Postgres: &PostgresConfig{
 				DataBaseDSN:       v.GetString(keyDatabaseDSN),
 				MaxConns:          int32(v.GetInt(keyMaxConns)),

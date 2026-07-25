@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"net"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
 	"github.com/Luclpor/url_shortener.git/internal/config/db"
+	"github.com/Luclpor/url_shortener.git/internal/grpc/pb"
+	"github.com/Luclpor/url_shortener.git/internal/handler/grpcapi"
 	"github.com/Luclpor/url_shortener.git/internal/logger"
 	router2 "github.com/Luclpor/url_shortener.git/internal/router"
 	"github.com/Luclpor/url_shortener.git/internal/service"
@@ -19,6 +22,8 @@ import (
 	"github.com/Luclpor/url_shortener.git/internal/storage/inmemory"
 	"github.com/Luclpor/url_shortener.git/internal/storage/postgres"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -26,6 +31,8 @@ const shutdownTimeout = 10 * time.Second
 // Server owns the configured HTTP server and shutdown resources.
 type Server struct {
 	httpServer  *http.Server
+	grpcServer  *grpc.Server
+	grpcAddress string
 	closers     []func() error
 	appLogger   *zap.Logger
 	useHTTPS    bool
@@ -119,12 +126,18 @@ func NewServer() (*Server, error) {
 			WriteTimeout: cfg.Timeout,
 			IdleTimeout:  cfg.IdleTimeout,
 		},
+		grpcAddress: cfg.GRPCServerAddress,
 		closers:     closers,
 		appLogger:   appLogger,
 		useHTTPS:    cfg.EnableHTTPS,
 		tlsCertFile: cfg.TLSCertFile,
 		tlsKeyFile:  cfg.TLSKeyFile,
 	}
+	grpcServer, err := server.newGRPCServer(cfg, manager, userAuth, eventAuditPublisher)
+	if err != nil {
+		return nil, err
+	}
+	server.grpcServer = grpcServer
 
 	return server, nil
 }
@@ -134,13 +147,22 @@ func (s *Server) Start() error {
 	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
-	serverErrCh := make(chan error, 1)
+	serverErrCh := make(chan error, 2)
 	go func() {
 		s.appLogger.Info("Server listening on",
 			zap.String("server_address", s.httpServer.Addr),
 			zap.Bool("https_enabled", s.useHTTPS),
 		)
 		if err := s.listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErrCh <- err
+		}
+	}()
+	go func() {
+		s.appLogger.Info("gRPC server listening on",
+			zap.String("grpc_server_address", s.grpcAddress),
+			zap.Bool("tls_enabled", s.useHTTPS),
+		)
+		if err := s.listenAndServeGRPC(); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			serverErrCh <- err
 		}
 	}()
@@ -157,21 +179,36 @@ func (s *Server) Start() error {
 		if shutdownErr != nil {
 			s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
 		}
+		grpcShutdownErr := s.shutdownGRPC(shutdownTimeoutCtx)
+		if grpcShutdownErr != nil {
+			s.appLogger.Error("gRPC server forced to shutdown", zap.Error(grpcShutdownErr))
+		}
 		closeErr := s.closeResources()
 		if closeErr != nil {
 			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
 		}
-		if err := errors.Join(shutdownErr, closeErr); err != nil {
+		if err := errors.Join(shutdownErr, grpcShutdownErr, closeErr); err != nil {
 			return err
 		}
 	case serverErr := <-serverErrCh:
 		s.appLogger.Error("Error starting server", zap.Error(serverErr))
 
+		shutdownTimeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		shutdownErr := s.httpServer.Shutdown(shutdownTimeoutCtx)
+		if shutdownErr != nil && !errors.Is(shutdownErr, http.ErrServerClosed) {
+			s.appLogger.Error("server forced to shutdown", zap.Error(shutdownErr))
+		}
+		grpcShutdownErr := s.shutdownGRPC(shutdownTimeoutCtx)
+		if grpcShutdownErr != nil {
+			s.appLogger.Error("gRPC server forced to shutdown", zap.Error(grpcShutdownErr))
+		}
 		closeErr := s.closeResources()
 		if closeErr != nil {
 			s.appLogger.Error("server resources close failed", zap.Error(closeErr))
 		}
-		if err := errors.Join(serverErr, closeErr); err != nil {
+		if err := errors.Join(serverErr, shutdownErr, grpcShutdownErr, closeErr); err != nil {
 			return err
 		}
 	}
@@ -194,7 +231,7 @@ func (s *Server) listenAndServe() error {
 		return s.httpServer.ListenAndServe()
 	}
 
-	certificate, err := s.tlsCertificate()
+	certificate, err := s.tlsCertificateFor(s.httpServer.Addr)
 	if err != nil {
 		return err
 	}
@@ -209,12 +246,67 @@ func (s *Server) listenAndServe() error {
 	return s.httpServer.Serve(listener)
 }
 
+func (s *Server) newGRPCServer(cfg *config.Config, manager *service.URLManager, userAuth auth.UserAuthentication, eventPublisher *audit.Event) (*grpc.Server, error) {
+	options := make([]grpc.ServerOption, 0)
+	if s.useHTTPS {
+		certificate, err := s.tlsCertificateFor(s.grpcAddress)
+		if err != nil {
+			return nil, err
+		}
+		options = append(options, grpc.Creds(credentials.NewTLS(&tls.Config{
+			Certificates: []tls.Certificate{certificate},
+			MinVersion:   tls.VersionTLS12,
+		})))
+	}
+
+	grpcServer := grpc.NewServer(options...)
+	pb.RegisterShortenerServiceServer(grpcServer, grpcapi.NewShortenerServer(cfg, manager, userAuth, eventPublisher, s.appLogger))
+	return grpcServer, nil
+}
+
+func (s *Server) listenAndServeGRPC() error {
+	listener, err := net.Listen("tcp", s.grpcAddress)
+	if err != nil {
+		return err
+	}
+	return s.grpcServer.Serve(listener)
+}
+
+func (s *Server) shutdownGRPC(ctx context.Context) error {
+	if s.grpcServer == nil {
+		return nil
+	}
+
+	stopped := make(chan struct{})
+	go func() {
+		s.grpcServer.GracefulStop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+		return nil
+	case <-ctx.Done():
+		s.grpcServer.Stop()
+		<-stopped
+		return ctx.Err()
+	}
+}
+
 func (s *Server) tlsCertificate() (tls.Certificate, error) {
+	address := ""
+	if s.httpServer != nil {
+		address = s.httpServer.Addr
+	}
+	return s.tlsCertificateFor(address)
+}
+
+func (s *Server) tlsCertificateFor(address string) (tls.Certificate, error) {
 	if (s.tlsCertFile == "") != (s.tlsKeyFile == "") {
 		return tls.Certificate{}, errors.New("tls cert file and tls key file must be set together")
 	}
 	if s.tlsCertFile != "" || s.tlsKeyFile != "" {
 		return tls.LoadX509KeyPair(s.tlsCertFile, s.tlsKeyFile)
 	}
-	return newSelfSignedCertificate(s.httpServer.Addr)
+	return newSelfSignedCertificate(address)
 }

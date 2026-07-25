@@ -52,6 +52,7 @@ func TestInitConfigFlagEnablesHTTPSWhenEnvIsFalse(t *testing.T) {
 func TestInitConfigLoadsJSONConfigFileFromFlag(t *testing.T) {
 	configPath := writeConfigFile(t, `{
 		"server_address": "127.0.0.1:9090",
+		"grpc_server_address": "127.0.0.1:9091",
 		"base_url": "https://short.test",
 		"file_storage_path": "/tmp/urls.db",
 		"database_dsn": "postgres://user:pass@localhost:5432/shortener",
@@ -71,6 +72,7 @@ func TestInitConfigLoadsJSONConfigFileFromFlag(t *testing.T) {
 	}
 
 	assertConfigValue(t, "ServerAddress", cfg.ServerAddress, "127.0.0.1:9090")
+	assertConfigValue(t, "GRPCServerAddress", cfg.GRPCServerAddress, "127.0.0.1:9091")
 	assertConfigValue(t, "BaseAddressShort", cfg.BaseAddressShort, "https://short.test")
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://short.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/urls.db")
@@ -88,6 +90,7 @@ func TestInitConfigLoadsJSONConfigFileFromFlag(t *testing.T) {
 func TestInitConfigLoadsJSONConfigFileFromEnv(t *testing.T) {
 	configPath := writeConfigFile(t, `{
 		"server_address": "127.0.0.1:7070",
+		"grpc_server_address": "127.0.0.1:7071",
 		"base_url": "https://env-config.test",
 		"file_storage_path": "/tmp/env-config.db",
 		"database_dsn": "config-env-dsn",
@@ -106,6 +109,7 @@ func TestInitConfigLoadsJSONConfigFileFromEnv(t *testing.T) {
 	}
 
 	assertConfigValue(t, "ServerAddress", cfg.ServerAddress, "127.0.0.1:7070")
+	assertConfigValue(t, "GRPCServerAddress", cfg.GRPCServerAddress, "127.0.0.1:7071")
 	assertConfigValue(t, "BaseAddressShort", cfg.BaseAddressShort, "https://env-config.test")
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://env-config.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/env-config.db")
@@ -121,6 +125,7 @@ func TestInitConfigLoadsJSONConfigFileFromEnv(t *testing.T) {
 func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 	configPath := writeConfigFile(t, `{
 		"server_address": "127.0.0.1:9090",
+		"grpc_server_address": "127.0.0.1:9091",
 		"base_url": "https://config.test",
 		"file_storage_path": "/tmp/config.db",
 		"database_dsn": "config-dsn",
@@ -135,6 +140,7 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 		"shortener",
 		"-config", configPath,
 		"-a", "127.0.0.1:6060",
+		"-g", "127.0.0.1:6061",
 		"-b", "https://flag.test",
 		"-f", "/tmp/flag.db",
 		"-d", "flag-dsn",
@@ -153,6 +159,7 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 	}
 
 	assertConfigValue(t, "ServerAddress", cfg.ServerAddress, "127.0.0.1:6060")
+	assertConfigValue(t, "GRPCServerAddress", cfg.GRPCServerAddress, "127.0.0.1:6061")
 	assertConfigValue(t, "BaseAddressShort", cfg.BaseAddressShort, "https://flag.test")
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://flag.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/flag.db")
@@ -170,6 +177,7 @@ func TestInitConfigFlagsOverrideJSONConfigFile(t *testing.T) {
 func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 	configPath := writeConfigFile(t, `{
 		"server_address": "127.0.0.1:9090",
+		"grpc_server_address": "127.0.0.1:9091",
 		"base_url": "https://config.test",
 		"file_storage_path": "/tmp/config.db",
 		"database_dsn": "config-dsn",
@@ -183,6 +191,7 @@ func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 	resetConfigTestState(t, []string{"shortener", "-c", configPath})
 	clearConfigEnv(t)
 	t.Setenv("SERVER_ADDRESS", "127.0.0.1:5050")
+	t.Setenv("GRPC_SERVER_ADDRESS", "127.0.0.1:5051")
 	t.Setenv("BASE_URL", "https://env.test")
 	t.Setenv("FILE_STORAGE_PATH", "/tmp/env.db")
 	t.Setenv("DATABASE_DSN", "env-dsn")
@@ -199,6 +208,7 @@ func TestInitConfigEnvOverridesJSONConfigFile(t *testing.T) {
 	}
 
 	assertConfigValue(t, "ServerAddress", cfg.ServerAddress, "127.0.0.1:5050")
+	assertConfigValue(t, "GRPCServerAddress", cfg.GRPCServerAddress, "127.0.0.1:5051")
 	assertConfigValue(t, "BaseAddressShort", cfg.BaseAddressShort, "https://env.test")
 	assertConfigValue(t, "BaseURL", cfg.BaseURL, "https://env.test")
 	assertConfigValue(t, "FileStoragePath", cfg.FileStoragePath, "/tmp/env.db")
@@ -234,6 +244,7 @@ func clearConfigEnv(t *testing.T) {
 	keys := []string{
 		"CONFIG",
 		"SERVER_ADDRESS",
+		"GRPC_SERVER_ADDRESS",
 		"BASE_URL",
 		"FILE_STORAGE_PATH",
 		"DATABASE_DSN",
