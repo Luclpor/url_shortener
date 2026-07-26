@@ -211,4 +211,20 @@ func (r *URLRepository) DeleteBatch(ctx context.Context, deleteShortURLs map[uui
 	return tx.Commit(ctx)
 }
 
+// GetStats returns service-wide URL and user counts.
+func (r *URLRepository) GetStats(ctx context.Context) (int, int, error) {
+	const query = `
+		SELECT
+			(SELECT COUNT(*) FROM url_shortener),
+			(SELECT COUNT(*) FROM service_user)
+	`
+	var urls int64
+	var users int64
+	err := r.pool.QueryRow(ctx, query).Scan(&urls, &users)
+	if err != nil {
+		return 0, 0, err
+	}
+	return int(urls), int(users), nil
+}
+
 var _ service.URLRepository = (*URLRepository)(nil)

@@ -24,6 +24,7 @@ func NewRouter(cfg *config.Config, manager *service.URLManager, healthService *s
 	r.Use(middleware.Timeout(777 * time.Second))
 	r.Use(customMidlleware.CompressMiddleware)
 	r.Get("/ping", handler.NewPingHandler())
+	r.Get("/api/internal/stats", handler.NewStatsHandler())
 
 	r.Route("/", func(r chi.Router) {
 		r.Use(customMidlleware.Auth(userAuth, appLogger))

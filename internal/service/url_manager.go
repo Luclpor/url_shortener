@@ -34,6 +34,8 @@ type URLRepository interface {
 	SaveBatch(ctx context.Context, dtos []dto.URLDto) ([]model.ShortenURL, error)
 	// DeleteBatch marks short URL keys as deleted for their users.
 	DeleteBatch(ctx context.Context, deleteShortURLs map[uuid.UUID][]string) error
+	// GetStats returns service-wide URL and user counts.
+	GetStats(ctx context.Context) (urls int, users int, err error)
 }
 
 // URLManager coordinates URL shortening, lookup, listing, and asynchronous deletion.
@@ -136,6 +138,18 @@ func (m *URLManager) GetBatchURLByUserID(ctx context.Context, user *model.User) 
 		return nil, err
 	}
 	return urls, nil
+}
+
+// GetStats returns service-wide URL and user counts.
+func (m *URLManager) GetStats(ctx context.Context) (*api.StatsResp, error) {
+	urls, users, err := m.repo.GetStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &api.StatsResp{
+		URLs:  urls,
+		Users: users,
+	}, nil
 }
 
 func (m *URLManager) getUniqueKey(ctx context.Context, longURL string, count int, userID uuid.UUID) (string, bool) {

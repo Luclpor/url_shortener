@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
@@ -27,10 +29,14 @@ type Handler struct {
 	health         *service.HealthService
 	logger         *zap.Logger
 	eventPublisher *audit.Event
+	trustedSubnet  *net.IPNet
 }
 
 // NewHandler creates a Handler with all service dependencies.
 func NewHandler(cfg *config.Config, health *service.HealthService, manager *service.URLManager, userAuth auth.UserAuthentication, eventPublisher *audit.Event, appLogger *zap.Logger) *Handler {
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
 	return &Handler{
 		cfg:            cfg,
 		health:         health,
@@ -38,6 +44,7 @@ func NewHandler(cfg *config.Config, health *service.HealthService, manager *serv
 		manager:        manager,
 		logger:         appLogger,
 		eventPublisher: eventPublisher,
+		trustedSubnet:  parseTrustedSubnet(cfg.TrustedSubnet),
 	}
 }
 
@@ -257,4 +264,48 @@ func (h *Handler) NewGetBatchHandler() http.HandlerFunc {
 		}
 		render.JSON(w, r, urls)
 	}
+}
+
+// NewStatsHandler returns a handler for GET /api/internal/stats.
+func (h *Handler) NewStatsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isTrustedIP(h.trustedSubnet, r.Header.Get("X-Real-IP")) {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		stats, err := h.manager.GetStats(r.Context())
+		if err != nil {
+			h.logger.Error("failed to get stats:", zap.Error(err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		render.JSON(w, r, stats)
+	}
+}
+
+func parseTrustedSubnet(trustedSubnet string) *net.IPNet {
+	trustedSubnet = strings.TrimSpace(trustedSubnet)
+	if trustedSubnet == "" {
+		return nil
+	}
+
+	_, subnet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil {
+		return nil
+	}
+	return subnet
+}
+
+func isTrustedIP(trustedSubnet *net.IPNet, realIP string) bool {
+	realIP = strings.TrimSpace(realIP)
+	if trustedSubnet == nil || realIP == "" {
+		return false
+	}
+
+	ip := net.ParseIP(realIP)
+	if ip == nil {
+		return false
+	}
+
+	return trustedSubnet.Contains(ip)
 }

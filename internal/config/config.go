@@ -10,6 +10,7 @@ import (
 
 const (
 	defaultServerAddress    = "localhost:8080"
+	defaultGRPCServerAddr   = "localhost:3200"
 	defaultBaseURL          = "http://localhost:8080"
 	defaultFileStoragePath  = "shortenest_url.txt"
 	defaultDatabaseDSN      = ""
@@ -18,6 +19,7 @@ const (
 	defaultConfigFilePath   = ""
 	defaultTLSCertFile      = ""
 	defaultTLSKeyFile       = ""
+	defaultTrustedSubnet    = ""
 	defaultHTTPS            = false
 	defaultTimeout          = time.Second * 4
 	defaultIdleTimeout      = time.Second * 30
@@ -36,6 +38,7 @@ const (
 const (
 	keyAppEnv            = "app_env"
 	keyServerAddress     = "server_address"
+	keyGRPCServerAddress = "grpc_server_address"
 	keyBaseURL           = "base_url"
 	keyFileStoragePath   = "file_storage_path"
 	keyStorageType       = "storage_type"
@@ -44,6 +47,7 @@ const (
 	keyEnableHTTPS       = "enable_https"
 	keyTLSCertFile       = "tls_cert_file"
 	keyTLSKeyFile        = "tls_key_file"
+	keyTrustedSubnet     = "trusted_subnet"
 	keyConfigFilePath    = "config"
 	keyDatabaseDSN       = "database_dsn"
 	keyMaxConns          = "max_conns"
@@ -70,6 +74,8 @@ type Config struct {
 type HTTPServer struct {
 	// ServerAddress is the bind address of the HTTP server.
 	ServerAddress string
+	// GRPCServerAddress is the bind address of the gRPC server.
+	GRPCServerAddress string
 	// BaseURL duplicates BaseAddressShort for callers that read HTTP server settings directly.
 	BaseURL string
 	// StorageType names the configured storage backend.
@@ -84,6 +90,8 @@ type HTTPServer struct {
 	TLSCertFile string
 	// TLSKeyFile is a path to the TLS private key file.
 	TLSKeyFile string
+	// TrustedSubnet contains CIDR notation of the subnet allowed to access internal endpoints.
+	TrustedSubnet string
 	// Postgres holds PostgreSQL connection pool settings.
 	Postgres *PostgresConfig
 	// Timeout is applied to HTTP read and write operations.
@@ -142,6 +150,7 @@ func InitConfig() (*Config, error) {
 	flagSet := flag.CommandLine
 
 	flagSet.String("a", defaultServerAddress, "host address server")
+	flagSet.String("g", defaultGRPCServerAddr, "grpc server address")
 	flagSet.String("b", defaultBaseURL, "base url for short url")
 	flagSet.String("f", defaultFileStoragePath, "file storage path")
 	flagSet.String("d", defaultDatabaseDSN, "dsn connection to db")
@@ -152,6 +161,7 @@ func InitConfig() (*Config, error) {
 	flagSet.Bool("s", defaultHTTPS, "enable HTTPS")
 	flagSet.String("tls-cert-file", defaultTLSCertFile, "TLS public certificate file path")
 	flagSet.String("tls-key-file", defaultTLSKeyFile, "TLS private key file path")
+	flagSet.String("t", defaultTrustedSubnet, "trusted subnet in CIDR notation")
 
 	flag.Parse()
 
@@ -176,6 +186,7 @@ func InitConfig() (*Config, error) {
 func setDefaults(v *viper.Viper) {
 	v.SetDefault(keyAppEnv, "development")
 	v.SetDefault(keyServerAddress, defaultServerAddress)
+	v.SetDefault(keyGRPCServerAddress, defaultGRPCServerAddr)
 	v.SetDefault(keyBaseURL, defaultBaseURL)
 	v.SetDefault(keyFileStoragePath, defaultFileStoragePath)
 	v.SetDefault(keyStorageType, "")
@@ -184,6 +195,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault(keyEnableHTTPS, defaultHTTPS)
 	v.SetDefault(keyTLSCertFile, defaultTLSCertFile)
 	v.SetDefault(keyTLSKeyFile, defaultTLSKeyFile)
+	v.SetDefault(keyTrustedSubnet, defaultTrustedSubnet)
 	v.SetDefault(keyConfigFilePath, defaultConfigFilePath)
 	v.SetDefault(keyDatabaseDSN, defaultDatabaseDSN)
 	v.SetDefault(keyMaxConns, defaultMaxConns)
@@ -197,6 +209,7 @@ func bindEnv(v *viper.Viper) {
 	envBindings := map[string]string{
 		keyAppEnv:            "APP_ENV",
 		keyServerAddress:     "SERVER_ADDRESS",
+		keyGRPCServerAddress: "GRPC_SERVER_ADDRESS",
 		keyBaseURL:           "BASE_URL",
 		keyFileStoragePath:   "FILE_STORAGE_PATH",
 		keyStorageType:       "STORAGE_TYPE",
@@ -205,6 +218,7 @@ func bindEnv(v *viper.Viper) {
 		keyEnableHTTPS:       "ENABLE_HTTPS",
 		keyTLSCertFile:       "TLS_CERT_FILE",
 		keyTLSKeyFile:        "TLS_KEY_FILE",
+		keyTrustedSubnet:     "TRUSTED_SUBNET",
 		keyConfigFilePath:    "CONFIG",
 		keyDatabaseDSN:       "DATABASE_DSN",
 		keyMaxConns:          "MAX_CONNS",
@@ -225,6 +239,7 @@ func bindFlags(v *viper.Viper, flagSet *flag.FlagSet) error {
 		valueType string
 	}{
 		{flagName: "a", key: keyServerAddress, valueType: "string"},
+		{flagName: "g", key: keyGRPCServerAddress, valueType: "string"},
 		{flagName: "b", key: keyBaseURL, valueType: "string"},
 		{flagName: "f", key: keyFileStoragePath, valueType: "string"},
 		{flagName: "d", key: keyDatabaseDSN, valueType: "string"},
@@ -233,6 +248,7 @@ func bindFlags(v *viper.Viper, flagSet *flag.FlagSet) error {
 		{flagName: "s", key: keyEnableHTTPS, valueType: "bool"},
 		{flagName: "tls-cert-file", key: keyTLSCertFile, valueType: "string"},
 		{flagName: "tls-key-file", key: keyTLSKeyFile, valueType: "string"},
+		{flagName: "t", key: keyTrustedSubnet, valueType: "string"},
 	}
 	for _, binding := range flagBindings {
 		f := flagSet.Lookup(binding.flagName)
@@ -277,16 +293,18 @@ func buildConfig(v *viper.Viper) *Config {
 	return &Config{
 		AppEnv: v.GetString(keyAppEnv),
 		HTTPServer: HTTPServer{
-			ServerAddress: v.GetString(keyServerAddress),
-			BaseURL:       baseURL,
-			StorageType:   v.GetString(keyStorageType),
-			Timeout:       defaultTimeout,
-			IdleTimeout:   defaultIdleTimeout,
-			AuditFile:     v.GetString(keyAuditFile),
-			AuditURL:      v.GetString(keyAuditURL),
-			EnableHTTPS:   v.GetBool(keyEnableHTTPS),
-			TLSCertFile:   v.GetString(keyTLSCertFile),
-			TLSKeyFile:    v.GetString(keyTLSKeyFile),
+			ServerAddress:     v.GetString(keyServerAddress),
+			GRPCServerAddress: v.GetString(keyGRPCServerAddress),
+			BaseURL:           baseURL,
+			StorageType:       v.GetString(keyStorageType),
+			Timeout:           defaultTimeout,
+			IdleTimeout:       defaultIdleTimeout,
+			AuditFile:         v.GetString(keyAuditFile),
+			AuditURL:          v.GetString(keyAuditURL),
+			EnableHTTPS:       v.GetBool(keyEnableHTTPS),
+			TLSCertFile:       v.GetString(keyTLSCertFile),
+			TLSKeyFile:        v.GetString(keyTLSKeyFile),
+			TrustedSubnet:     v.GetString(keyTrustedSubnet),
 			Postgres: &PostgresConfig{
 				DataBaseDSN:       v.GetString(keyDatabaseDSN),
 				MaxConns:          int32(v.GetInt(keyMaxConns)),

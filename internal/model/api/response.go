@@ -13,3 +13,11 @@ type ShortenBatchResp struct {
 	// ShortURL contains the absolute shortened URL.
 	ShortURL string `json:"short_url"`
 }
+
+// StatsResp is the response returned by the internal service statistics endpoint.
+type StatsResp struct {
+	// URLs is the total number of shortened URL records in the service.
+	URLs int `json:"urls"`
+	// Users is the total number of users in the service.
+	Users int `json:"users"`
+}
