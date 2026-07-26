@@ -2,6 +2,7 @@ package grpcapi
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/Luclpor/url_shortener.git/internal/config"
@@ -84,7 +85,20 @@ func TestShortenerServerExpandURLNotFound(t *testing.T) {
 	assert.Equal(t, codes.NotFound, status.Code(err))
 }
 
-func TestShortenerServerListUserURLsCreatesUserWhenAuthorizationIsMissing(t *testing.T) {
+func TestShortenerServerListUserURLsRequiresAuthorization(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mockRep := mock.NewMockURLRepository(ctrl)
+	user := &model.User{ID: uuid.New()}
+
+	server := newTestShortenerServer(mockRep, user)
+
+	_, err := server.ListUserURLs(context.Background(), &emptypb.Empty{})
+
+	require.Error(t, err)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+}
+
+func TestShortenerServerListUserURLs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockRep := mock.NewMockURLRepository(ctrl)
 	user := &model.User{ID: uuid.New()}
@@ -105,8 +119,9 @@ func TestShortenerServerListUserURLsCreatesUserWhenAuthorizationIsMissing(t *tes
 		}, nil)
 
 	server := newTestShortenerServer(mockRep, user)
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(authorizationMetadataKey, "token"))
 
-	got, err := server.ListUserURLs(context.Background(), &emptypb.Empty{})
+	got, err := server.ListUserURLs(ctx, &emptypb.Empty{})
 
 	require.NoError(t, err)
 	require.Len(t, got.GetUrl(), 2)
@@ -114,6 +129,14 @@ func TestShortenerServerListUserURLsCreatesUserWhenAuthorizationIsMissing(t *tes
 	assert.Equal(t, "https://example.com/first", got.GetUrl()[0].GetOriginalUrl())
 	assert.Equal(t, "http://short.test/second", got.GetUrl()[1].GetShortUrl())
 	assert.Equal(t, "https://example.com/second", got.GetUrl()[1].GetOriginalUrl())
+}
+
+func TestMapExpandURLErrorDoesNotExposeInternalDetails(t *testing.T) {
+	err := mapExpandURLError(errors.New("database password is secret"))
+
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
+	assert.NotContains(t, err.Error(), "database password")
 }
 
 func TestShortenerServerListUserURLsReturnsEmptyResponseForMissingURLs(t *testing.T) {

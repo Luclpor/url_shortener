@@ -16,7 +16,6 @@ import (
 	appErrors "github.com/Luclpor/url_shortener.git/pkg/errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -93,13 +92,7 @@ func (s *ShortenerServer) ExpandURL(ctx context.Context, req *pb.URLExpandReques
 
 	shortURL, err := s.manager.GetURL(ctx, req.GetId())
 	if err != nil {
-		if errors.Is(err, appErrors.ErrNotFound) {
-			return nil, status.Error(codes.NotFound, "url not found")
-		}
-		if errors.Is(err, appErrors.ErrURLWasDeleted) {
-			return nil, status.Error(codes.FailedPrecondition, "url was deleted")
-		}
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, mapExpandURLError(err)
 	}
 
 	s.publishAudit(&audit.EventAudit{
@@ -148,7 +141,7 @@ func (s *ShortenerServer) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*
 func (s *ShortenerServer) authenticate(ctx context.Context) (*model.User, error) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok || len(md.Get(authorizationMetadataKey)) == 0 {
-		return s.createUser(ctx)
+		return nil, status.Error(codes.Unauthenticated, "authorization metadata is required")
 	}
 
 	token := strings.TrimSpace(md.Get(authorizationMetadataKey)[0])
@@ -165,14 +158,15 @@ func (s *ShortenerServer) authenticate(ctx context.Context) (*model.User, error)
 	return user, nil
 }
 
-func (s *ShortenerServer) createUser(ctx context.Context) (*model.User, error) {
-	user, encryptedUserID, err := s.authService.CreateEncryptedUser()
-	if err != nil {
-		s.logger.Error("error creating new user", zap.Error(err))
-		return nil, status.Error(codes.Internal, "failed to create user")
+func mapExpandURLError(err error) error {
+	switch {
+	case errors.Is(err, appErrors.ErrNotFound):
+		return status.Error(codes.NotFound, "url not found")
+	case errors.Is(err, appErrors.ErrURLWasDeleted):
+		return status.Error(codes.FailedPrecondition, "url was deleted")
+	default:
+		return status.Error(codes.Internal, "failed to expand url")
 	}
-	_ = grpc.SetHeader(ctx, metadata.Pairs(authorizationMetadataKey, encryptedUserID))
-	return user, nil
 }
 
 func (s *ShortenerServer) publishAudit(event *audit.EventAudit) {
